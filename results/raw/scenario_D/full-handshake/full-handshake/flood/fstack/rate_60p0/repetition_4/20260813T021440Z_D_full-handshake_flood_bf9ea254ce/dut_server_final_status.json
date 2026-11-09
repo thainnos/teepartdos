@@ -1,0 +1,11 @@
+{
+  "AFFINITY": "1",
+  "EXIT_CODE": "0",
+  "MANIFEST_READY": "1",
+  "PID": "54363",
+  "RUN_DIR": "/root/tee_tls_runs/20260813T021440Z_D_full-handshake_flood_bf9ea254ce",
+  "STARTUP_ERROR": "",
+  "STATE": "exited",
+  "WRAPPER_EXIT_CODE": "0",
+  "WRAPPER_PID": "54349"
+}

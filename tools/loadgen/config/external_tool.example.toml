@@ -1,0 +1,13 @@
+# Generic external-tool runner configuration.
+# Copy to config/external_tool.toml and replace ONLY the command locally.
+# The example is intentionally benign; the runner does not construct or parse
+# protocol-specific traffic-generator arguments.
+
+[external]
+label = "tcp-syn"
+command = ["/usr/bin/ping", "-n", "192.0.2.1"]
+interface = "CHANGE_ME_DATA_INTERFACE"
+stop_signal = "SIGINT"
+stop_grace_s = 5.0
+require_tx_packets = true
+# cwd = "/optional/working/directory"

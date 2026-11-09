@@ -1,0 +1,75 @@
+From dcb010e276de92fb28c2f21d2f7d287fc12fb293 Mon Sep 17 00:00:00 2001
+From: Florian Foerster <florian.foerster@tha.de>
+Date: Fri, 17 Jul 2026 10:10:21 +0000
+Subject: [PATCH] ssl_tls13: initialize external D2 transform mode metadata
+
+Upstream-Status: Inappropriate [local experimental TLS 1.3 TrustZone for Arm Cortex-A research patch]
+
+---
+ library/ssl_tls13_keys.c | 43 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 43 insertions(+)
+
+diff --git a/library/ssl_tls13_keys.c b/library/ssl_tls13_keys.c
+index 4d51c12..97171c1 100644
+--- a/library/ssl_tls13_keys.c
++++ b/library/ssl_tls13_keys.c
+@@ -1815,6 +1815,14 @@ static int ssl_tls13_backend_setup_external_transform(
+     const mbedtls_ssl_ciphersuite_t *ciphersuite_info;
+     size_t key_len = 0;
+     size_t iv_len = 0;
++#if defined(MBEDTLS_USE_PSA_CRYPTO)
++    psa_key_type_t key_type;
++    psa_algorithm_t alg;
++    size_t key_bits;
++    psa_status_t status;
++#else
++    mbedtls_cipher_info_t const *cipher_info;
++#endif
+ 
+     if (ssl == NULL || ssl->conf == NULL || transform == NULL ||
+         transform_data == NULL || ssl->conf->tls13_crypto_backend == NULL) {
+@@ -1837,6 +1845,41 @@ static int ssl_tls13_backend_setup_external_transform(
+         transform->taglen = 16;
+     }
+ 
++    /*
++     * Even when the record cryptography itself is external, the normal record
++     * layer still uses the transform metadata to decide whether the transform
++     * is AEAD, whether TLSInnerPlaintext must be built, which AAD format to
++     * use, and how large the tag/minimum ciphertext is. In D2 the original
++     * version bound only the opaque external handle. That left the PSA/cipher
++     * mode metadata at its zero-initialized value, so the record layer treated
++     * the TLS 1.3 AES-GCM transform as a stream/MAC transform and failed in
++     * the HMAC path before the external record-seal callback was reached.
++     */
++#if defined(MBEDTLS_USE_PSA_CRYPTO)
++    status = mbedtls_ssl_cipher_to_psa(
++        (mbedtls_cipher_type_t) ciphersuite_info->cipher,
++        transform->taglen, &alg, &key_type, &key_bits);
++    if (status != PSA_SUCCESS) {
++        return PSA_TO_MBEDTLS_ERR(status);
++    }
++    (void) key_type;
++    (void) key_bits;
++    transform->psa_alg = alg;
++#else
++    cipher_info = mbedtls_cipher_info_from_type(ciphersuite_info->cipher);
++    if (cipher_info == NULL) {
++        return MBEDTLS_ERR_SSL_BAD_INPUT_DATA;
++    }
++    ret = mbedtls_cipher_setup(&transform->cipher_ctx_enc, cipher_info);
++    if (ret != 0) {
++        return ret;
++    }
++    ret = mbedtls_cipher_setup(&transform->cipher_ctx_dec, cipher_info);
++    if (ret != 0) {
++        return ret;
++    }
++#endif
++
+     transform->ivlen = iv_len;
+     transform->maclen = 0;
+     transform->fixed_ivlen = transform->ivlen;
+-- 
+2.47.3
+

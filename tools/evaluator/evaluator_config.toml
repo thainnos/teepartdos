@@ -1,0 +1,29 @@
+schema_version = 1
+
+[latency]
+relative_increase = 0.10
+iqr_fraction = 0.50
+default_absolute_guard_ms = 1.0
+app_rtt_absolute_guard_ms = 0.10
+
+[failures]
+reference_degraded_fraction = 0.0000001
+reference_saturated_fraction = 0.05
+generator_healthy_completion = 0.99
+generator_saturated_completion = 0.95
+
+[baseline]
+window_count = 4
+max_window_median_spread_fraction = 0.20
+
+[recovery]
+relative_tolerance = 0.10
+success_rate_tolerance_pp = 1.0
+final_fraction = 0.25
+minimum_target_seconds = 30.0
+
+[knee]
+repeated_support_fraction = 0.80
+
+[report]
+appendix_time_series = true

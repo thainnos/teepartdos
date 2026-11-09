@@ -1,0 +1,15 @@
+{
+  "generator_process_actual_end_utc_ns": 1786630947075689914,
+  "generator_process_actual_start_utc_ns": 1786630947020300585,
+  "generator_process_end_elapsed_from_reference_s": 20.056116591,
+  "generator_process_start_elapsed_from_reference_s": 20.000727262,
+  "generator_scheduled_process_start_utc_ns": 1786630947019234818,
+  "offered_load_phase_note": "generator.timeline.json is missing or invalid; validation will fail",
+  "offered_load_phase_timestamps_available": false,
+  "reference_actual_end_utc_ns": 1786631226081622475,
+  "reference_actual_start_utc_ns": 1786630927019573323,
+  "reference_scheduled_start_utc_ns": 1786630927019234818,
+  "run_id": "20260813T142147Z_A_full-handshake_flood_87276aa2ca",
+  "server_end_utc_ns": 1786631228981142284,
+  "server_start_utc_ns": 1786630911302107286
+}

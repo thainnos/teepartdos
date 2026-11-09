@@ -1,0 +1,175 @@
+From e593f09afd45f89859d4a3904752ad22e799e639 Mon Sep 17 00:00:00 2001
+From: Florian Foerster <florian.foerster@tha.de>
+Date: Fri, 17 Jul 2026 13:33:19 +0000
+Subject: [PATCH] ssl_tls13: add D3 external server ECDHE backend hooks
+
+Upstream-Status: Inappropriate [local experimental TLS 1.3 TrustZone for Arm Cortex-A research patch]
+---
+ include/mbedtls/ssl.h       | 33 ++++++++++++++++++++++++++++++---
+ library/ssl_tls.c           |  7 ++++++-
+ library/ssl_tls13_generic.c | 30 ++++++++++++++++++++++++++++++
+ library/ssl_tls13_keys.c    |  8 ++++++++
+ 4 files changed, 74 insertions(+), 4 deletions(-)
+
+diff --git a/include/mbedtls/ssl.h b/include/mbedtls/ssl.h
+index 84a068d96e..e2a36cc74e 100644
+--- a/include/mbedtls/ssl.h
++++ b/include/mbedtls/ssl.h
+@@ -1153,7 +1153,7 @@ typedef void mbedtls_ssl_async_cancel_t(mbedtls_ssl_context *ssl);
+ #if defined(MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND)
+ 
+ /** Local TLS 1.3 cryptographic-backend API revision. */
+-#define MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND_API_VERSION 3u
++#define MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND_API_VERSION 4u
+ 
+ /** The backend provides per-connection lifecycle callbacks. */
+ #define MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND_CAP_CONNECTION_LIFECYCLE 0x00000001u
+@@ -1170,13 +1170,17 @@ typedef void mbedtls_ssl_async_cancel_t(mbedtls_ssl_context *ssl);
+ /** The backend can calculate TLS 1.3 Finished verify_data. */
+ #define MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND_CAP_FINISHED             0x00000010u
+ 
+-/** Capabilities known by API revision 3. */
++/** The backend can own server-side TLS 1.3 ECDHE key generation. */
++#define MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND_CAP_ECDHE               0x00000020u
++
++/** Capabilities known by API revision 4. */
+ #define MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND_CAP_MASK \
+     (MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND_CAP_CONNECTION_LIFECYCLE | \
+      MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND_CAP_TRANSFORM_LIFECYCLE  | \
+      MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND_CAP_RECORD_AEAD          | \
+      MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND_CAP_KEY_SCHEDULE         | \
+-     MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND_CAP_FINISHED)
++     MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND_CAP_FINISHED             | \
++     MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND_CAP_ECDHE)
+ 
+ /**
+  * \brief Initialize backend state for one SSL connection.
+@@ -1298,10 +1302,31 @@ typedef int mbedtls_ssl_tls13_crypto_backend_handshake_keys_t(
+     uint16_t tls_version,
+     const unsigned char *shared_secret,
+     size_t shared_secret_len,
++    const unsigned char *peer_public_key,
++    size_t peer_public_key_len,
+     const unsigned char *transcript,
+     size_t transcript_len,
+     void **transform_data);
+ 
++/**
++ * \brief Generate a server-side TLS 1.3 ECDHE key share in an external
++ *        backend.
++ *
++ * API revision 4 uses this callback as Scenario D3: for a server-side
++ * full-handshake key exchange, the backend generates and stores the ECDHE
++ * private key and returns the public key share to be placed in ServerHello.
++ * The matching peer public key is later passed to the handshake-keys callback
++ * so the backend can compute the shared secret internally.
++ */
++typedef int mbedtls_ssl_tls13_crypto_backend_server_key_share_t(
++    mbedtls_ssl_context *ssl,
++    void *config_data,
++    void *connection_data,
++    uint16_t named_group,
++    unsigned char *public_key,
++    size_t public_key_size,
++    size_t *public_key_len);
++
+ /**
+  * \brief Derive TLS 1.3 application secrets and create a backend-owned
+  *        application record transform.
+@@ -1362,6 +1387,8 @@ typedef struct mbedtls_ssl_tls13_crypto_backend {
+         *application_keys;
+     mbedtls_ssl_tls13_crypto_backend_finished_t
+         *finished;
++    mbedtls_ssl_tls13_crypto_backend_server_key_share_t
++        *server_key_share;
+ } mbedtls_ssl_tls13_crypto_backend;
+ 
+ #endif /* MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND */
+diff --git a/library/ssl_tls.c b/library/ssl_tls.c
+index d14385bdaa..ae482e2425 100644
+--- a/library/ssl_tls.c
++++ b/library/ssl_tls.c
+@@ -3226,7 +3226,12 @@ int mbedtls_ssl_conf_tls13_crypto_backend(
+             MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND_CAP_FINISHED) != 0 &&
+          ((capabilities &
+             MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND_CAP_KEY_SCHEDULE) == 0 ||
+-          backend->finished == NULL))) {
++          backend->finished == NULL)) ||
++        ((capabilities &
++            MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND_CAP_ECDHE) != 0 &&
++         ((capabilities &
++            MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND_CAP_KEY_SCHEDULE) == 0 ||
++          backend->server_key_share == NULL))) {
+         return MBEDTLS_ERR_SSL_BAD_INPUT_DATA;
+     }
+ 
+diff --git a/library/ssl_tls13_generic.c b/library/ssl_tls13_generic.c
+index 0dcc33f4fa..75f426d58b 100644
+--- a/library/ssl_tls13_generic.c
++++ b/library/ssl_tls13_generic.c
+@@ -1727,6 +1727,36 @@ int mbedtls_ssl_tls13_generate_and_write_xxdh_key_exchange(
+     handshake->xxdh_psa_type = key_type;
+     ssl->handshake->xxdh_psa_bits = bits;
+ 
++#if defined(MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND)
++    if (ssl->conf != NULL &&
++        ssl->conf->endpoint == MBEDTLS_SSL_IS_SERVER &&
++        mbedtls_ssl_tls13_named_group_is_ecdhe(named_group) &&
++        ssl->conf->tls13_crypto_backend != NULL &&
++        (ssl->conf->tls13_crypto_backend->capabilities &
++            MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND_CAP_ECDHE) != 0 &&
++        ssl->conf->tls13_crypto_backend->server_key_share != NULL) {
++        ret = ssl->conf->tls13_crypto_backend->server_key_share(
++            ssl,
++            ssl->conf->p_tls13_crypto_backend,
++            mbedtls_ssl_get_tls13_crypto_backend_connection_data(ssl),
++            named_group,
++            buf,
++            buf_size,
++            &own_pubkey_len);
++        if (ret != 0) {
++            MBEDTLS_SSL_DEBUG_RET(1,
++                                  "TLS 1.3 backend server key share",
++                                  ret);
++            return ret;
++        }
++        handshake->xxdh_psa_privkey_is_external = 1;
++        *out_len = own_pubkey_len;
++        MBEDTLS_SSL_DEBUG_MSG(2,
++            ("TLS 1.3 crypto backend: external ECDHE key share"));
++        return 0;
++    }
++#endif /* MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND */
++
+     key_attributes = psa_key_attributes_init();
+     psa_set_key_usage_flags(&key_attributes, PSA_KEY_USAGE_DERIVE);
+     psa_set_key_algorithm(&key_attributes, alg);
+diff --git a/library/ssl_tls13_keys.c b/library/ssl_tls13_keys.c
+index 97171c1d72..41d332e259 100644
+--- a/library/ssl_tls13_keys.c
++++ b/library/ssl_tls13_keys.c
+@@ -1931,6 +1931,12 @@ static int ssl_tls13_backend_compute_shared_secret(
+         return MBEDTLS_ERR_SSL_FEATURE_UNAVAILABLE;
+     }
+ 
++    if (handshake->xxdh_psa_privkey_is_external != 0) {
++        *shared_secret = NULL;
++        *shared_secret_len = 0;
++        return 0;
++    }
++
+     if (mbedtls_ssl_tls13_named_group_is_ecdhe(handshake->offered_group_id) ||
+         mbedtls_ssl_tls13_named_group_is_ffdh(handshake->offered_group_id)) {
+ #if defined(PSA_WANT_ALG_ECDH) || defined(PSA_WANT_ALG_FFDH)
+@@ -2034,6 +2040,8 @@ static int ssl_tls13_generate_handshake_transform_backend(
+         (uint16_t) ssl->handshake->ciphersuite_info->id,
+         (uint16_t) MBEDTLS_SSL_VERSION_TLS1_3,
+         shared_secret, shared_secret_len,
++        ssl->handshake->xxdh_psa_peerkey,
++        ssl->handshake->xxdh_psa_peerkey_len,
+         transcript, transcript_len,
+         &transform_data);
+     if (ret != 0) {
+-- 
+2.47.3
+

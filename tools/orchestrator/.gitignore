@@ -1,0 +1,27 @@
+# Private deployment configuration
+config/campaign.local.toml
+git_am_error.txt
+# Results and generated state
+results/
+state/*
+!state/.gitkeep
+# Compatibility with early private configurations that placed runtime state
+# under orchestration/state instead of the repository-level state directory.
+orchestration/state/
+tmp_work/*
+
+# Certificates and private material
+certificates/
+*.key
+*.pem
+
+# Build products
+reference_client/tls_reference_client
+reference_client/results/
+__pycache__/
+*.pyc
+
+# Editor/OS files
+*.swp
+*~
+.DS_Store

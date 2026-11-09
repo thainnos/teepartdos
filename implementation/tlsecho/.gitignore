@@ -1,0 +1,50 @@
+# Host and TA build outputs
+*.o
+*.a
+*.so
+*.elf
+*.dmp
+*.map
+*.ta
+*.stripped.elf
+/scenario*/tls_echo_server_scenario_?
+/scenario*/ta/.*
+/scenario*/ta/dyn_list
+/scenario*/ta/ta.lds
+
+errordump/tls_echo_server_scenario_b
+
+scenariob/ta/.ta_key_mgmt.o.cmd
+scenariob/ta/.ta_key_mgmt.o.d
+scenariob/ta/.user_ta_header.o.cmd
+scenariob/ta/.user_ta_header.o.d
+
+
+# Local SDK/TA tooling
+/.venv-optee-ta/
+
+# Logs/results
+*.log
+results/
+*-results*/
+*.zip
+*.tar.gz
+
+# Certificates and keys
+certificates/
+certs/
+keys/
+*.key
+*.pem
+*.crt
+*.csr
+
+# Crash/debug outputs
+errordump/core.*
+
+# Editor/temp
+*~
+*.swp
+*.swo
+__pycache__/
+*.pyc

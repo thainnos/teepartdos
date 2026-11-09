@@ -1,0 +1,220 @@
+From 91c0a885abe361e9f3ede564948795928287f63b Mon Sep 17 00:00:00 2001
+From: Florian Foerster <florian.foerster@tha.de>
+Date: Wed, 15 Jul 2026 12:25:31 +0000
+Subject: [PATCH] ssl_tls13: route records through external backend
+ transforms
+
+Upstream-Status: Inappropriate [local experimental TLS 1.3 TrustZone for Arm Cortex-A research patch]
+
+---
+ library/ssl_msg.c        | 79 +++++++++++++++++++++++++++++++++++++++-
+ library/ssl_tls13_keys.c | 61 ++++++++++++++++++++++++++++++-
+ 2 files changed, 137 insertions(+), 3 deletions(-)
+
+diff --git a/library/ssl_msg.c b/library/ssl_msg.c
+index 5d82d53a0b..078e0b77be 100644
+--- a/library/ssl_msg.c
++++ b/library/ssl_msg.c
+@@ -919,7 +919,7 @@ int mbedtls_ssl_encrypt_buf(mbedtls_ssl_context *ssl,
+     size_t post_avail;
+ 
+     /* The SSL context is only used for debugging purposes! */
+-#if !defined(MBEDTLS_DEBUG_C)
++#if !defined(MBEDTLS_DEBUG_C) && !defined(MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND)
+     ssl = NULL; /* make sure we don't use it except for debug */
+     ((void) ssl);
+ #endif
+@@ -1193,6 +1193,43 @@ hmac_failed_etm_disabled:
+         /*
+          * Encrypt and authenticate
+          */
++#if defined(MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND)
++        if (mbedtls_ssl_transform_uses_external_crypto_backend(transform) != 0) {
++            size_t sealed_len = 0;
++
++            if (ssl == NULL ||
++                transform->tls13_crypto_backend == NULL ||
++                transform->tls13_crypto_backend->record_seal == NULL) {
++                return MBEDTLS_ERR_SSL_INTERNAL_ERROR;
++            }
++
++            MBEDTLS_SSL_DEBUG_MSG(
++                3,
++                ("TLS 1.3 record seal backend: external"));
++
++            ret = transform->tls13_crypto_backend->record_seal(
++                ssl,
++                transform->p_tls13_crypto_backend,
++                transform->tls13_crypto_backend_connection_data,
++                transform->tls13_crypto_backend_transform_data,
++                add_data, add_data_len,
++                data, rec->data_len,
++                data, rec->buf_len - (size_t) (data - rec->buf),
++                &sealed_len);
++            if (ret != 0) {
++                MBEDTLS_SSL_DEBUG_RET(
++                    1, "TLS 1.3 record seal backend", ret);
++                return ret;
++            }
++
++            if (sealed_len < transform->taglen) {
++                return MBEDTLS_ERR_SSL_INTERNAL_ERROR;
++            }
++            rec->data_len = sealed_len;
++            goto ssl_tls13_external_aead_encrypted;
++        }
++#endif /* MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND */
++
+ #if defined(MBEDTLS_USE_PSA_CRYPTO)
+         status = psa_aead_encrypt(transform->psa_key_enc,
+                                   transform->psa_alg,
+@@ -1220,6 +1257,7 @@ hmac_failed_etm_disabled:
+         }
+ #endif /* MBEDTLS_USE_PSA_CRYPTO */
+ 
++ssl_tls13_external_aead_encrypted:
+         MBEDTLS_SSL_DEBUG_BUF(4, "after encrypt: tag",
+                               data + rec->data_len - transform->taglen,
+                               transform->taglen);
+@@ -1502,7 +1540,7 @@ int mbedtls_ssl_decrypt_buf(mbedtls_ssl_context const *ssl,
+ #endif
+     size_t add_data_len;
+ 
+-#if !defined(MBEDTLS_DEBUG_C)
++#if !defined(MBEDTLS_DEBUG_C) && !defined(MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND)
+     ssl = NULL; /* make sure we don't use it except for debug */
+     ((void) ssl);
+ #endif
+@@ -1620,6 +1658,42 @@ int mbedtls_ssl_decrypt_buf(mbedtls_ssl_context const *ssl,
+         /*
+          * Decrypt and authenticate
+          */
++#if defined(MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND)
++        if (mbedtls_ssl_transform_uses_external_crypto_backend(transform) != 0) {
++            size_t opened_len = 0;
++            size_t ciphertext_len = rec->data_len + transform->taglen;
++
++            if (ssl == NULL ||
++                transform->tls13_crypto_backend == NULL ||
++                transform->tls13_crypto_backend->record_open == NULL) {
++                return MBEDTLS_ERR_SSL_INTERNAL_ERROR;
++            }
++
++            MBEDTLS_SSL_DEBUG_MSG(
++                3,
++                ("TLS 1.3 record open backend: external"));
++
++            ret = transform->tls13_crypto_backend->record_open(
++                (mbedtls_ssl_context *) ssl,
++                transform->p_tls13_crypto_backend,
++                transform->tls13_crypto_backend_connection_data,
++                transform->tls13_crypto_backend_transform_data,
++                add_data, add_data_len,
++                data, ciphertext_len,
++                data, rec->buf_len - (size_t) (data - rec->buf),
++                &opened_len);
++            if (ret != 0) {
++                MBEDTLS_SSL_DEBUG_RET(
++                    1, "TLS 1.3 record open backend", ret);
++                return ret;
++            }
++
++            olen = opened_len;
++            auth_done++;
++            goto ssl_tls13_external_aead_decrypted;
++        }
++#endif /* MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND */
++
+ #if defined(MBEDTLS_USE_PSA_CRYPTO)
+         status = psa_aead_decrypt(transform->psa_key_dec,
+                                   transform->psa_alg,
+@@ -1654,6 +1728,7 @@ int mbedtls_ssl_decrypt_buf(mbedtls_ssl_context const *ssl,
+ 
+         auth_done++;
+ 
++ssl_tls13_external_aead_decrypted:
+         /* Double-check that AEAD decryption doesn't change content length. */
+         if (olen != rec->data_len) {
+             MBEDTLS_SSL_DEBUG_MSG(1, ("should never happen"));
+diff --git a/library/ssl_tls13_keys.c b/library/ssl_tls13_keys.c
+index 739414ea2f..e6758b7bac 100644
+--- a/library/ssl_tls13_keys.c
++++ b/library/ssl_tls13_keys.c
+@@ -945,7 +945,7 @@ int mbedtls_ssl_tls13_populate_transform(
+     psa_status_t status = PSA_SUCCESS;
+ #endif
+ 
+-#if !defined(MBEDTLS_DEBUG_C)
++#if !defined(MBEDTLS_DEBUG_C) && !defined(MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND)
+     ssl = NULL; /* make sure we don't use it except for those cases */
+     (void) ssl;
+ #endif
+@@ -1086,6 +1086,65 @@ int mbedtls_ssl_tls13_populate_transform(
+     }
+ #endif /* MBEDTLS_USE_PSA_CRYPTO */
+ 
++#if defined(MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND)
++    if (ssl != NULL && ssl->conf != NULL &&
++        ssl->conf->tls13_crypto_backend != NULL &&
++        (ssl->conf->tls13_crypto_backend->capabilities &
++            MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND_CAP_RECORD_AEAD) != 0) {
++        const mbedtls_ssl_tls13_crypto_backend *backend =
++            ssl->conf->tls13_crypto_backend;
++        void *config_data = ssl->conf->p_tls13_crypto_backend;
++        void *connection_data =
++            mbedtls_ssl_get_tls13_crypto_backend_connection_data(ssl);
++        void *transform_data = NULL;
++
++        if (backend->transform_import == NULL ||
++            backend->record_seal == NULL ||
++            backend->record_open == NULL) {
++            return MBEDTLS_ERR_SSL_INTERNAL_ERROR;
++        }
++
++        ret = backend->transform_import(
++            ssl,
++            config_data,
++            connection_data,
++            (uint16_t) ciphersuite,
++            (uint16_t) MBEDTLS_SSL_VERSION_TLS1_3,
++            transform->taglen,
++            key_enc, traffic_keys->key_len,
++            iv_enc, traffic_keys->iv_len,
++            key_dec, traffic_keys->key_len,
++            iv_dec, traffic_keys->iv_len,
++            &transform_data);
++        if (ret != 0) {
++            MBEDTLS_SSL_DEBUG_RET(1,
++                                  "TLS 1.3 record backend import", ret);
++            return ret;
++        }
++
++        ret = mbedtls_ssl_tls13_crypto_backend_bind_transform(
++            transform,
++            backend,
++            config_data,
++            connection_data,
++            transform_data);
++        if (ret != 0) {
++            if (backend->transform_free != NULL) {
++                backend->transform_free(config_data,
++                                        connection_data,
++                                        transform_data);
++            }
++            MBEDTLS_SSL_DEBUG_RET(1,
++                                  "TLS 1.3 record backend bind", ret);
++            return ret;
++        }
++
++        MBEDTLS_SSL_DEBUG_MSG(
++            2,
++            ("TLS 1.3 record backend transform imported"));
++    }
++#endif /* MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND */
++
+     return 0;
+ }
+ 
+-- 
+2.47.3
+

@@ -1,0 +1,57 @@
+{
+  "campaign_type": "repeated",
+  "campaigns": {
+    "A": {
+      "campaign_id": "A-tls-flood-high-final-v1",
+      "manifest_path": "_campaigns/ABCDE-tls-flood-high-final-v1/campaigns/A-tls-flood-high-final-v1/campaign_manifest.json",
+      "status": "complete",
+      "updated_utc": "2026-08-13T13:17:48.503871370Z"
+    },
+    "B": {
+      "campaign_id": "B-tls-flood-high-final-v1",
+      "manifest_path": "_campaigns/ABCDE-tls-flood-high-final-v1/campaigns/B-tls-flood-high-final-v1/campaign_manifest.json",
+      "status": "complete",
+      "updated_utc": "2026-08-13T13:17:48.818422133Z"
+    },
+    "C": {
+      "campaign_id": "C-tls-flood-high-final-v1",
+      "manifest_path": "_campaigns/ABCDE-tls-flood-high-final-v1/campaigns/C-tls-flood-high-final-v1/campaign_manifest.json",
+      "status": "complete",
+      "updated_utc": "2026-08-13T13:17:49.139487680Z"
+    },
+    "D": {
+      "campaign_id": "D-tls-flood-high-final-v1",
+      "manifest_path": "_campaigns/ABCDE-tls-flood-high-final-v1/campaigns/D-tls-flood-high-final-v1/campaign_manifest.json",
+      "status": "complete",
+      "updated_utc": "2026-08-13T13:17:49.452477622Z"
+    },
+    "E": {
+      "campaign_id": "E-tls-flood-high-final-v1",
+      "manifest_path": "_campaigns/ABCDE-tls-flood-high-final-v1/campaigns/E-tls-flood-high-final-v1/campaign_manifest.json",
+      "status": "complete",
+      "updated_utc": "2026-08-13T13:17:49.770863871Z"
+    }
+  },
+  "complete_scenarios": [
+    "A",
+    "B",
+    "C",
+    "D",
+    "E"
+  ],
+  "created_utc": "2026-08-13T04:40:42.196832370Z",
+  "expected_scenarios": [
+    "A",
+    "B",
+    "C",
+    "D",
+    "E"
+  ],
+  "generator_backend": "fstack",
+  "generator_mode": "flood",
+  "missing_or_incomplete_scenarios": [],
+  "overall_campaign_id": "ABCDE-tls-flood-high-final-v1",
+  "schema_version": 1,
+  "status": "complete",
+  "updated_utc": "2026-08-13T13:17:49.780608297Z"
+}

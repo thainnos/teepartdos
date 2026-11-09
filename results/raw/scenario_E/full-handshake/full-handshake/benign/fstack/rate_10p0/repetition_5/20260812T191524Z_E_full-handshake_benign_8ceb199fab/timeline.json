@@ -1,0 +1,20 @@
+{
+  "generator_phase_run_end_deadline_utc_ns": 1786562285608250538,
+  "generator_phase_run_end_elapsed_from_reference_s": 143.401375679,
+  "generator_phase_run_end_observed_utc_ns": 1786562285608255798,
+  "generator_phase_run_end_reason": "duration-complete",
+  "generator_phase_run_start_elapsed_from_reference_s": 23.401375679,
+  "generator_phase_run_start_utc_ns": 1786562165608250538,
+  "generator_process_actual_end_utc_ns": 1786562285718357882,
+  "generator_process_actual_start_utc_ns": 1786562162207019340,
+  "generator_process_end_elapsed_from_reference_s": 143.511483023,
+  "generator_process_start_elapsed_from_reference_s": 20.000144481,
+  "generator_scheduled_process_start_utc_ns": 1786562162206532559,
+  "offered_load_phase_timestamps_available": true,
+  "reference_actual_end_utc_ns": 1786562441288439639,
+  "reference_actual_start_utc_ns": 1786562142206874859,
+  "reference_scheduled_start_utc_ns": 1786562142206532559,
+  "run_id": "20260812T191524Z_E_full-handshake_benign_8ceb199fab",
+  "server_end_utc_ns": 1786562444319694666,
+  "server_start_utc_ns": 1786562126596342213
+}

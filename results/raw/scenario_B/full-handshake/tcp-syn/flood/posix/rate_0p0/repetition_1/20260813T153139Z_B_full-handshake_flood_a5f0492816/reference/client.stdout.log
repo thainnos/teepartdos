@@ -1,0 +1,57 @@
+Reference client 0.1.1
+OpenSSL runtime: OpenSSL 3.5.7 9 Jun 2026
+Scenario: B
+Workload: full-handshake
+Repetition: 1
+Run ID: 20260813T153139Z_B_full-handshake_flood_a5f0492816
+Duration: 300 s, probe interval: 1000 ms, payload: 1024 bytes
+CSV: /home/referenceuser/TEE_TLS_DoS/results/scenario_B/full-handshake/tcp-syn/flood/posix/rate_0p0/repetition_1/20260813T153139Z_B_full-handshake_flood_a5f0492816/reference/tls_reference_B_full-handshake_r1_20260813T153139Z_B_full-handshake_flood_a5f0492816.csv
+Metadata: /home/referenceuser/TEE_TLS_DoS/results/scenario_B/full-handshake/tcp-syn/flood/posix/rate_0p0/repetition_1/20260813T153139Z_B_full-handshake_flood_a5f0492816/reference/tls_reference_B_full-handshake_r1_20260813T153139Z_B_full-handshake_flood_a5f0492816.metadata.json
+[full-handshake] probe=0 result=0 handshake_us=14802 app_rtt_us=2223
+[full-handshake] probe=1 result=0 handshake_us=15766 app_rtt_us=1930
+[full-handshake] probe=2 result=0 handshake_us=15827 app_rtt_us=1906
+[full-handshake] probe=3 result=0 handshake_us=15831 app_rtt_us=1915
+[full-handshake] probe=4 result=0 handshake_us=15821 app_rtt_us=1909
+[full-handshake] probe=5 result=0 handshake_us=15745 app_rtt_us=1940
+[full-handshake] probe=6 result=0 handshake_us=15765 app_rtt_us=1922
+[full-handshake] probe=7 result=0 handshake_us=15756 app_rtt_us=1907
+[full-handshake] probe=8 result=0 handshake_us=15746 app_rtt_us=1918
+[full-handshake] probe=9 result=0 handshake_us=15790 app_rtt_us=1926
+[full-handshake] probe=10 result=0 handshake_us=15760 app_rtt_us=1914
+[full-handshake] probe=11 result=0 handshake_us=15797 app_rtt_us=1905
+[full-handshake] probe=12 result=0 handshake_us=15757 app_rtt_us=1917
+[full-handshake] probe=13 result=0 handshake_us=15946 app_rtt_us=2212
+[full-handshake] probe=14 result=0 handshake_us=15485 app_rtt_us=1942
+[full-handshake] probe=15 result=0 handshake_us=15763 app_rtt_us=1624
+[full-handshake] probe=16 result=0 handshake_us=15510 app_rtt_us=1913
+[full-handshake] probe=17 result=0 handshake_us=15816 app_rtt_us=1910
+[full-handshake] probe=18 result=0 handshake_us=15746 app_rtt_us=1913
+[full-handshake] probe=19 result=0 handshake_us=15886 app_rtt_us=2205
+[full-handshake] probe=20 result=0 handshake_us=15798 app_rtt_us=1916
+[full-handshake] probe=21 result=0 handshake_us=15813 app_rtt_us=1939
+[full-handshake] probe=22 result=0 handshake_us=15787 app_rtt_us=1926
+[full-handshake] probe=23 result=0 handshake_us=15801 app_rtt_us=1906
+[full-handshake] probe=24 result=0 handshake_us=15801 app_rtt_us=1919
+[full-handshake] probe=25 result=0 handshake_us=15775 app_rtt_us=1897
+[full-handshake] probe=26 result=0 handshake_us=15793 app_rtt_us=1896
+[full-handshake] probe=27 result=0 handshake_us=15631 app_rtt_us=1910
+[full-handshake] probe=28 result=0 handshake_us=15742 app_rtt_us=1901
+[full-handshake] probe=29 result=0 handshake_us=15738 app_rtt_us=1901
+[full-handshake] probe=30 result=0 handshake_us=15781 app_rtt_us=1898
+[full-handshake] probe=31 result=0 handshake_us=15481 app_rtt_us=1926
+[full-handshake] probe=32 result=0 handshake_us=15792 app_rtt_us=1610
+[full-handshake] probe=33 result=0 handshake_us=15823 app_rtt_us=1899
+[full-handshake] probe=34 result=0 handshake_us=15747 app_rtt_us=1900
+[full-handshake] probe=35 result=0 handshake_us=15774 app_rtt_us=1903
+[full-handshake] probe=36 result=0 handshake_us=15756 app_rtt_us=1933
+[full-handshake] probe=37 result=0 handshake_us=15840 app_rtt_us=1921
+[full-handshake] probe=38 result=0 handshake_us=15829 app_rtt_us=1892
+[full-handshake] probe=39 result=0 handshake_us=15761 app_rtt_us=1914
+[full-handshake] probe=40 result=0 handshake_us=15606 app_rtt_us=1940
+[full-handshake] probe=41 result=0 handshake_us=15960 app_rtt_us=1623
+[full-handshake] probe=42 result=0 handshake_us=15838 app_rtt_us=2217
+[full-handshake] probe=43 result=0 handshake_us=15757 app_rtt_us=1925
+[full-handshake] probe=44 result=0 handshake_us=15472 app_rtt_us=1931
+[full-handshake] probe=45 result=0 handshake_us=15819 app_rtt_us=1620
+[full-handshake] probe=46 result=0 handshake_us=15831 app_rtt_us=2209
+[full-handshake] probe=47 result=0 handshake_us=

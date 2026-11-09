@@ -1,0 +1,167 @@
+# Copy to config/campaign.local.toml and replace every CHANGE_ME value.
+# campaign.local.toml is ignored by Git.
+
+[repository]
+root = "~/TeePartDos/tools/orchestrator"
+results_root = "~/TeePartDos/tools/orchestrator/results"
+state_root = "~/TeePartDos/tools/orchestrator/state"
+
+[ssh]
+# Reference setup: password SSH is the verified default. Set auth = "key" to use public-key SSH (alternative; not validated on the reference hardware).
+auth = "password"
+# Per-host overrides: dut.ssh_auth / loadgen.ssh_auth.
+# Per-host identity files: dut.ssh_identity_file / loadgen.ssh_identity_file.
+# New host keys are accepted once; changed host keys remain fatal.
+options = [
+  "-o", "ConnectTimeout=8",
+  "-o", "ServerAliveInterval=10",
+  "-o", "ServerAliveCountMax=3",
+  "-o", "StrictHostKeyChecking=accept-new"
+]
+
+[experiment]
+data_subnet = "192.0.2.0/24"
+control_subnet = "198.51.100.0/24"
+dut_address = "192.0.2.150"
+dut_mac = "02:00:00:00:00:50" # illustrative; replace with actual DUT MAC
+tls_port = 4433
+server_name = "tls-echo-server"
+tls_ciphersuite = "TLS_AES_128_GCM_SHA256"
+tls_group = "P-256"
+tls_signature_algorithm = "ecdsa_secp256r1_sha256"
+payload_size = 1024
+reference_probe_interval_ms = 1000
+mtu = 1500
+pre_generation_s = 20
+generator_duration_s = 120
+reference_duration_s = 300
+start_delay_s = 15
+server_ready_timeout_s = 30
+process_grace_s = 10
+transfer_timeout_s = 300
+clock_samples = 7
+pilot_max_offset_ms = 500.0
+measurement_max_offset_ms = 20.0
+max_clock_uncertainty_ms = 25.0
+
+[reference]
+data_interface = "CHANGE_ME_DATA_INTERFACE"
+data_address = "192.0.2.1"
+control_interface = "CHANGE_ME_REF_CONTROL_INTERFACE"
+control_address = "198.51.100.1"
+binary = "~/TeePartDos/tools/orchestrator/reference_client/tls_reference_client"
+config = "~/TeePartDos/tools/orchestrator/reference_client/reference_client.conf"
+ca_file = "~/TeePartDos/tools/orchestrator/certificates/server.crt"
+plot_script = "~/TeePartDos/tools/orchestrator/plotting/plot_reference_client.py"
+
+[reference.profile]
+strict_shutdown = false
+tcp_connect_timeout_ms = 5000
+tls_handshake_timeout_ms = 5000
+io_timeout_ms = 5000
+payload_mode = "fixed_pattern"
+payload_pattern_hex = "a5"
+payload_seed = 12345
+resumption_policy = "reuse_seed"
+tcp_nodelay = true
+record_reconnect_on_failure = true
+record_reconnect_backoff_ms = 1000
+output_csv_prefix = "tls_reference"
+stdout_progress = true
+
+[dut]
+ssh_target = "root@198.51.100.150"
+# Required when ssh.auth = "password" (the reference default):
+ssh_password = "CHANGE_ME_DUT_SSH_PASSWORD"
+# ssh_identity_file = "~/.ssh/id_ed25519"
+ssh_options = []
+agent = "/usr/local/sbin/tee-tls-dut-agent"
+agent_config = "/etc/tee-tls-orchestrator/dut-agent.conf"
+run_root = "/root/tee_tls_runs"
+data_interface = "eth0"
+data_address = "192.0.2.150"
+control_interface = "eth1"
+control_address = "198.51.100.150"
+server_cpu = 1
+server_cert = "/root/certs/server.crt"
+server_key = "/root/certs/server.key"
+iperf3 = "/usr/bin/iperf3"
+
+[loadgen]
+ssh_target = "CHANGE_ME_LOADGEN_USER@198.51.100.50"
+# Required when ssh.auth = "password" (the reference default):
+ssh_password = "CHANGE_ME_LOADGEN_SSH_PASSWORD"
+# ssh_identity_file = "~/.ssh/id_ed25519"
+# Used only while installing/updating the restricted root-owned load-generator agent.
+# It may be the same value as ssh_password. Normal runs use sudo -n for that agent only.
+sudo_password = "CHANGE_ME_LOADGEN_SUDO_PASSWORD"
+ssh_options = []
+ssh_user = "CHANGE_ME_LOADGEN_USER"
+agent = "/usr/local/sbin/tee-tls-loadgen-agent"
+agent_config = "/etc/tee-tls-orchestrator/loadgen-agent.conf"
+project_root = "/home/CHANGE_ME_LOADGEN_USER/tls_loadgen"
+run_root = "/home/CHANGE_ME_LOADGEN_USER/tls_loadgen/orchestrated-results"
+data_interface = "CHANGE_ME_DATA_INTERFACE"
+data_address = "192.0.2.50"
+control_interface = "CHANGE_ME_LOADGEN_CONTROL_INTERFACE"
+control_address = "198.51.100.50"
+pci_address = "CHANGE_ME_PCI_ADDRESS"
+kernel_driver = "CHANGE_ME_KERNEL_DRIVER"
+posix_binary = "/home/CHANGE_ME_LOADGEN_USER/tls_loadgen/bin/tls_loadgen_posix"
+fstack_binary = "/home/CHANGE_ME_LOADGEN_USER/tls_loadgen/bin/tls_loadgen_fstack"
+generator_config = "/home/CHANGE_ME_LOADGEN_USER/tls_loadgen/config/generator.conf"
+fstack_config = "/home/CHANGE_ME_LOADGEN_USER/tls_loadgen/config/f-stack.conf"
+ca_file = "/home/CHANGE_ME_LOADGEN_USER/certificates/server.crt"
+openssl_lib = "/opt/openssl-3.5.7/lib"
+openssl_modules = "/opt/openssl-3.5.7/lib/ossl-modules"
+iperf3 = "/usr/bin/iperf3"
+
+[loadgen.profile]
+network_netmask = "255.255.255.0"
+tcp_nodelay = true
+max_release_burst = 4096
+drain_timeout_ms = 10000
+tcp_connect_timeout_ms = 5000
+tls_handshake_timeout_ms = 5000
+io_timeout_ms = 5000
+payload_pattern_hex = "a5"
+full_echo_after_handshake = false
+resumption_policy = "reuse_seed"
+resumption_pool_size = 32
+wait_for_fresh_ticket = true
+record_max_pending_releases = 4096
+record_reconnect = true
+record_reconnect_backoff_ms = 1000
+stdout_progress = true
+fstack_proc_id = 0
+
+[dut.server]
+max_payload = 16384
+listen_backlog = 128
+max_connections = 256
+handshake_timeout_ms = 30000
+idle_timeout_ms = 30000
+summary_interval_ms = 1000
+
+[dut.scenario_binaries]
+A = "/root/scenarios/a/tls_echo_server_scenario_a"
+B = "/root/scenarios/b/tls_echo_server_scenario_b"
+C = "/root/scenarios/c/tls_echo_server_scenario_c"
+D = "/root/scenarios/d/tls_echo_server_scenario_d"
+E = "/root/scenarios/e/tls_echo_server_scenario_e"
+
+[iperf]
+port = 5201
+duration_s = 30
+parallel_streams = 1
+udp_enabled = true
+udp_rate = "950M"
+server_ready_wait_s = 2
+
+[defaults.generator]
+backend = "fstack"
+workload = "resumption"
+mode = "benign"
+rate = 10.0
+max_inflight = 512
+record_connections = 32

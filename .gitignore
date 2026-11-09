@@ -1,0 +1,22 @@
+# Local private configuration and generated files
+**/__pycache__/
+**/*.py[cod]
+**/venv/
+**/.venv/
+**/bin/
+**/*.o
+**/*.a
+**/*.so
+**/*.ta
+**/*.cmd
+**/orchestrated-results/
+**/functional-results/
+**/test-results/
+**/results-local/
+**/*local.toml
+**/*local.conf
+**/certificates/
+**/*.key
+**/*.p12
+**/*.pfx
+.DS_Store

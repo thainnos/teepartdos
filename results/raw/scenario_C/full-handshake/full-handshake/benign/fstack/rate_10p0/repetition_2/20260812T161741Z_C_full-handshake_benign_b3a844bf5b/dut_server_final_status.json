@@ -1,0 +1,11 @@
+{
+  "AFFINITY": "1",
+  "EXIT_CODE": "0",
+  "MANIFEST_READY": "1",
+  "PID": "39859",
+  "RUN_DIR": "/root/tee_tls_runs/20260812T161741Z_C_full-handshake_benign_b3a844bf5b",
+  "STARTUP_ERROR": "",
+  "STATE": "exited",
+  "WRAPPER_EXIT_CODE": "0",
+  "WRAPPER_PID": "39845"
+}

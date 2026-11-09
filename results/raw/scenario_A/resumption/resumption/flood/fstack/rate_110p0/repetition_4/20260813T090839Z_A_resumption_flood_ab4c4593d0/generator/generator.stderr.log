@@ -1,0 +1,9 @@
+EAL: Detected CPU lcores: 12
+EAL: Detected NUMA nodes: 1
+EAL: Detected static linkage of DPDK
+EAL: Cannot create lock on '/var/run/dpdk/container-tls_loadgen/config'. Is another primary process running?
+EAL: FATAL: Cannot init config
+EAL: Cannot init config
+EAL: Error - exiting with code: 1
+  Cause: Error with EAL initialization
+EAL: Unregistering with invalid input parameter

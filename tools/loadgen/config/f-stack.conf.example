@@ -1,0 +1,45 @@
+# F-Stack v1.25 / bundled DPDK 23.11.5
+# One port, one polling core, one process. Copy to config/f-stack.conf and adjust only
+# after the preflight scripts confirm the PCI address and CPU allocation.
+
+[dpdk]
+lcore_mask=4
+channel=2
+promiscuous=1
+numa_on=0
+tso=0
+vlan_strip=0
+idle_sleep=0
+pkt_tx_delay=0
+port_list=0
+allow=CHANGE_ME_PCI_ADDRESS
+
+# Keep one unique prefix for this generator installation.
+file_prefix=tls_loadgen
+
+[port0]
+addr=192.0.2.50
+netmask=255.255.255.0
+broadcast=192.0.2.255
+# The DUT is on-link; this gateway is not used for 192.0.2.0/24 traffic.
+# Change it if 192.0.2.1 is already assigned and F-Stack validates gateway uniqueness.
+gateway=192.0.2.1
+lcore_list=2
+
+[freebsd.boot]
+hz=100
+fd_reserve=1024
+kern.ipc.maxsockets=262144
+net.inet.tcp.syncache.hashsize=4096
+net.inet.tcp.syncache.bucketlimit=256
+net.inet.tcp.tcbhashsize=65536
+kern.ncallout=262144
+
+[freebsd.sysctl]
+kern.ipc.somaxconn=32768
+net.inet.tcp.msl=2000
+net.inet.tcp.finwait2_timeout=5000
+net.inet.tcp.keepinit=5000
+net.inet.tcp.keepidle=30000
+net.inet.tcp.keepintvl=5000
+net.inet.tcp.delayed_ack=0

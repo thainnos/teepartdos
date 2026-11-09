@@ -1,0 +1,161 @@
+From 4412182f8e16cd98c4af3f73370a3e3d48c2a2be Mon Sep 17 00:00:00 2001
+From: Florian Foerster <florian.foerster@tha.de>
+Date: Fri, 3 Jul 2026 08:35:55 +0000
+Subject: [PATCH] ssl: add external transform ownership discrimination
+
+Upstream-Status: Inappropriate [local experimental TLS 1.3 TrustZone for Arm Cortex-A research patch]
+
+---
+ library/ssl_misc.h | 35 +++++++++++++++++++++++++++++
+ library/ssl_msg.c  | 55 ++++++++++++++++++++++++++++++++++++++++++++++
+ library/ssl_tls.c  |  5 +++++
+ 3 files changed, 95 insertions(+)
+
+diff --git a/library/ssl_misc.h b/library/ssl_misc.h
+index 98668798a8..ab63a8534f 100644
+--- a/library/ssl_misc.h
++++ b/library/ssl_misc.h
+@@ -1035,6 +1035,13 @@ struct mbedtls_ssl_handshake_params {
+ 
+ typedef struct mbedtls_ssl_hs_buffer mbedtls_ssl_hs_buffer;
+ 
++#if defined(MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND)
++typedef enum {
++    MBEDTLS_SSL_TRANSFORM_BACKEND_SOFTWARE = 0,
++    MBEDTLS_SSL_TRANSFORM_BACKEND_EXTERNAL = 1
++} mbedtls_ssl_transform_backend_t;
++#endif /* MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND */
++
+ /*
+  * Representation of decryption/encryption transformations on records
+  *
+@@ -1115,6 +1122,14 @@ typedef struct mbedtls_ssl_hs_buffer mbedtls_ssl_hs_buffer;
+  *
+  */
+ struct mbedtls_ssl_transform {
++#if defined(MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND)
++    mbedtls_ssl_transform_backend_t tls13_crypto_backend_type;
++    const mbedtls_ssl_tls13_crypto_backend *tls13_crypto_backend;
++    void *p_tls13_crypto_backend;
++    void *tls13_crypto_backend_connection_data;
++    void *tls13_crypto_backend_transform_data;
++#endif /* MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND */
++
+     /*
+      * Session specific crypto layer
+      */
+@@ -1311,6 +1326,26 @@ unsigned int mbedtls_ssl_tls12_get_preferred_hash_for_sig_alg(
+  */
+ void mbedtls_ssl_transform_free(mbedtls_ssl_transform *transform);
+ 
++#if defined(MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND)
++/**
++ * \brief Bind application-owned state to an external TLS 1.3 transform.
++ *
++ * This is an internal L1 helper. It must be called on a freshly initialized
++ * transform before software keys are populated.
++ */
++MBEDTLS_CHECK_RETURN_CRITICAL
++int mbedtls_ssl_tls13_crypto_backend_bind_transform(
++    mbedtls_ssl_transform *transform,
++    const mbedtls_ssl_tls13_crypto_backend *backend,
++    void *config_data,
++    void *connection_data,
++    void *transform_data);
++
++/** Return non-zero if \p transform is owned by an external backend. */
++int mbedtls_ssl_transform_uses_external_crypto_backend(
++    const mbedtls_ssl_transform *transform);
++#endif /* MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND */
++
+ /**
+  * \brief           Free referenced items in an SSL handshake context and clear
+  *                  memory
+diff --git a/library/ssl_msg.c b/library/ssl_msg.c
+index ef722d7bdc..5d82d53a0b 100644
+--- a/library/ssl_msg.c
++++ b/library/ssl_msg.c
+@@ -6209,12 +6209,67 @@ int mbedtls_ssl_close_notify(mbedtls_ssl_context *ssl)
+     return 0;
+ }
+ 
++#if defined(MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND)
++int mbedtls_ssl_tls13_crypto_backend_bind_transform(
++    mbedtls_ssl_transform *transform,
++    const mbedtls_ssl_tls13_crypto_backend *backend,
++    void *config_data,
++    void *connection_data,
++    void *transform_data)
++{
++    if (transform == NULL ||
++        backend == NULL ||
++        backend->api_version !=
++            MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND_API_VERSION ||
++        backend->struct_size <
++            sizeof(mbedtls_ssl_tls13_crypto_backend) ||
++        (backend->capabilities &
++            MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND_CAP_TRANSFORM_LIFECYCLE) == 0 ||
++        backend->transform_free == NULL ||
++        transform->tls13_crypto_backend_type !=
++            MBEDTLS_SSL_TRANSFORM_BACKEND_SOFTWARE ||
++        transform->tls13_crypto_backend != NULL ||
++        transform->tls13_crypto_backend_transform_data != NULL) {
++        return MBEDTLS_ERR_SSL_BAD_INPUT_DATA;
++    }
++
++    transform->tls13_crypto_backend_type =
++        MBEDTLS_SSL_TRANSFORM_BACKEND_EXTERNAL;
++    transform->tls13_crypto_backend = backend;
++    transform->p_tls13_crypto_backend = config_data;
++    transform->tls13_crypto_backend_connection_data = connection_data;
++    transform->tls13_crypto_backend_transform_data = transform_data;
++
++    return 0;
++}
++
++int mbedtls_ssl_transform_uses_external_crypto_backend(
++    const mbedtls_ssl_transform *transform)
++{
++    return transform != NULL &&
++           transform->tls13_crypto_backend_type ==
++               MBEDTLS_SSL_TRANSFORM_BACKEND_EXTERNAL;
++}
++#endif /* MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND */
++
+ void mbedtls_ssl_transform_free(mbedtls_ssl_transform *transform)
+ {
+     if (transform == NULL) {
+         return;
+     }
+ 
++#if defined(MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND)
++    if (transform->tls13_crypto_backend_type ==
++            MBEDTLS_SSL_TRANSFORM_BACKEND_EXTERNAL &&
++        transform->tls13_crypto_backend != NULL &&
++        transform->tls13_crypto_backend->transform_free != NULL) {
++        transform->tls13_crypto_backend->transform_free(
++            transform->p_tls13_crypto_backend,
++            transform->tls13_crypto_backend_connection_data,
++            transform->tls13_crypto_backend_transform_data);
++    }
++#endif /* MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND */
++
+ #if defined(MBEDTLS_USE_PSA_CRYPTO)
+     psa_destroy_key(transform->psa_key_enc);
+     psa_destroy_key(transform->psa_key_dec);
+diff --git a/library/ssl_tls.c b/library/ssl_tls.c
+index 645df5c179..958c5efc27 100644
+--- a/library/ssl_tls.c
++++ b/library/ssl_tls.c
+@@ -1021,6 +1021,11 @@ void mbedtls_ssl_transform_init(mbedtls_ssl_transform *transform)
+ {
+     memset(transform, 0, sizeof(mbedtls_ssl_transform));
+ 
++#if defined(MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND)
++    transform->tls13_crypto_backend_type =
++        MBEDTLS_SSL_TRANSFORM_BACKEND_SOFTWARE;
++#endif
++
+ #if defined(MBEDTLS_USE_PSA_CRYPTO)
+     transform->psa_key_enc = MBEDTLS_SVC_KEY_ID_INIT;
+     transform->psa_key_dec = MBEDTLS_SVC_KEY_ID_INIT;

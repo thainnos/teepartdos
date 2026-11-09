@@ -1,0 +1,10 @@
+{
+  "archive_bytes": 440320,
+  "archive_sha256": "53c8d1be26f8b21bfe581bdd4adba31aac03bee1963da8de110c50748499b783",
+  "collected_utc": "2026-08-13T00:05:23.027088017Z",
+  "files": 18,
+  "host": "dut",
+  "method": "agent-tar-stream-over-ssh",
+  "payload_bytes": 423152,
+  "run_id": "20260813T000001Z_B_resumption_flood_e080fe232e"
+}

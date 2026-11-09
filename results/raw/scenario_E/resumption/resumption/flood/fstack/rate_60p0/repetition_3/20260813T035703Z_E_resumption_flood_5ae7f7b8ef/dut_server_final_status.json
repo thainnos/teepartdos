@@ -1,0 +1,11 @@
+{
+  "AFFINITY": "1",
+  "EXIT_CODE": "0",
+  "MANIFEST_READY": "1",
+  "PID": "57334",
+  "RUN_DIR": "/root/tee_tls_runs/20260813T035703Z_E_resumption_flood_5ae7f7b8ef",
+  "STARTUP_ERROR": "",
+  "STATE": "exited",
+  "WRAPPER_EXIT_CODE": "0",
+  "WRAPPER_PID": "57320"
+}

@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "run_id": "20260812T162305Z_C_full-handshake_benign_a03d7cc412",
+  "scenario": "C",
+  "workload": "full-handshake",
+  "mode": "benign",
+  "backend": "fstack",
+  "generator_version": "0.1.5",
+  "generator_git_commit": "fcf975fc9409",
+  "clock_realtime": "CLOCK_REALTIME",
+  "scheduling_clock": "CLOCK_MONOTONIC",
+  "process_started_utc_ns": 1786551822626139472,
+  "phase_run_started_utc_ns": 1786551826017025099,
+  "phase_run_end_deadline_utc_ns": 1786551946017025099,
+  "phase_run_end_observed_utc_ns": 1786551946017031667,
+  "drain_finished_utc_ns": 1786551946021549958,
+  "process_finished_utc_ns": 1786551946073809555,
+  "configured_duration_s": 120,
+  "run_end_reason": "duration-complete",
+  "current_phase": "done",
+  "terminal": true
+}

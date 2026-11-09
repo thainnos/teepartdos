@@ -1,0 +1,57 @@
+{
+  "campaign_type": "repeated",
+  "campaigns": {
+    "A": {
+      "campaign_id": "A-external-tcp-final-20260812-01",
+      "manifest_path": "_campaigns/ABCDE-external-tcp-final-20260813-01/campaigns/A-external-tcp-final-20260812-01/campaign_manifest.json",
+      "status": "complete",
+      "updated_utc": "2026-08-13T20:13:58.031951240Z"
+    },
+    "B": {
+      "campaign_id": "B-external-tcp-final-20260812-01",
+      "manifest_path": "_campaigns/ABCDE-external-tcp-final-20260813-01/campaigns/B-external-tcp-final-20260812-01/campaign_manifest.json",
+      "status": "complete",
+      "updated_utc": "2026-08-13T20:13:58.348872767Z"
+    },
+    "C": {
+      "campaign_id": "C-external-tcp-final-20260812-01",
+      "manifest_path": "_campaigns/ABCDE-external-tcp-final-20260813-01/campaigns/C-external-tcp-final-20260812-01/campaign_manifest.json",
+      "status": "complete",
+      "updated_utc": "2026-08-13T20:13:58.668150585Z"
+    },
+    "D": {
+      "campaign_id": "E-external-tcp-final-20260812-01",
+      "manifest_path": "_campaigns/ABCDE-external-tcp-final-20260813-01/campaigns/E-external-tcp-final-20260812-01/campaign_manifest.json",
+      "status": "complete",
+      "updated_utc": "2026-08-13T20:13:59.304138968Z"
+    },
+    "E": {
+      "campaign_id": "D-external-tcp-final-20260812-01",
+      "manifest_path": "_campaigns/ABCDE-external-tcp-final-20260813-01/campaigns/D-external-tcp-final-20260812-01/campaign_manifest.json",
+      "status": "complete",
+      "updated_utc": "2026-08-13T20:13:58.987893786Z"
+    }
+  },
+  "complete_scenarios": [
+    "A",
+    "B",
+    "C",
+    "D",
+    "E"
+  ],
+  "created_utc": "2026-08-13T14:21:47.329999746Z",
+  "expected_scenarios": [
+    "A",
+    "B",
+    "C",
+    "D",
+    "E"
+  ],
+  "generator_backend": "posix",
+  "generator_mode": "flood",
+  "missing_or_incomplete_scenarios": [],
+  "overall_campaign_id": "ABCDE-external-tcp-final-20260813-01",
+  "schema_version": 1,
+  "status": "complete",
+  "updated_utc": "2026-08-13T20:13:59.314315645Z"
+}

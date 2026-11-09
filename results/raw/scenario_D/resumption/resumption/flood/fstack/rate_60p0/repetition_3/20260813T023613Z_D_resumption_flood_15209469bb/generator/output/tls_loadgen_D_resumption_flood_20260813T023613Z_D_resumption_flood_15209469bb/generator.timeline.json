@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "run_id": "20260813T023613Z_D_resumption_flood_15209469bb",
+  "scenario": "D",
+  "workload": "resumption",
+  "mode": "flood",
+  "backend": "fstack",
+  "generator_version": "0.1.5",
+  "generator_git_commit": "fcf975fc9409",
+  "clock_realtime": "CLOCK_REALTIME",
+  "scheduling_clock": "CLOCK_MONOTONIC",
+  "process_started_utc_ns": 1786588610736126552,
+  "phase_run_started_utc_ns": 1786588615722859194,
+  "phase_run_end_deadline_utc_ns": 1786588735722859194,
+  "phase_run_end_observed_utc_ns": 1786588735722871805,
+  "drain_finished_utc_ns": 1786588738370074380,
+  "process_finished_utc_ns": 1786588738440915286,
+  "configured_duration_s": 120,
+  "run_end_reason": "duration-complete",
+  "current_phase": "done",
+  "terminal": true
+}

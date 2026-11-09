@@ -1,0 +1,290 @@
+From b0ecca0b90f142c88aaad12e3f8c6a198b8bfb82 Mon Sep 17 00:00:00 2001
+From: Florian Foerster <florian.foerster@tha.de>
+Date: Sun, 19 Jul 2026 11:43:08 +0000
+Subject: [PATCH] ssl_tls13: add D4 resumption backend hooks
+
+Upstream-Status: Inappropriate [local experimental TLS 1.3 TrustZone for Arm Cortex-A research patch]
+---
+ include/mbedtls/ssl.h      | 57 ++++++++++++++++++++++++++++++++++++--
+ library/ssl_tls.c          |  8 +++++-
+ library/ssl_tls13_keys.c   | 55 ++++++++++++++++++++++++++++++++++++
+ library/ssl_tls13_server.c | 35 +++++++++++++++++++++++
+ 4 files changed, 151 insertions(+), 4 deletions(-)
+
+diff --git a/include/mbedtls/ssl.h b/include/mbedtls/ssl.h
+index e2a36cc74e..4031c30cb7 100644
+--- a/include/mbedtls/ssl.h
++++ b/include/mbedtls/ssl.h
+@@ -1153,7 +1153,7 @@ typedef void mbedtls_ssl_async_cancel_t(mbedtls_ssl_context *ssl);
+ #if defined(MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND)
+ 
+ /** Local TLS 1.3 cryptographic-backend API revision. */
+-#define MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND_API_VERSION 4u
++#define MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND_API_VERSION 5u
+ 
+ /** The backend provides per-connection lifecycle callbacks. */
+ #define MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND_CAP_CONNECTION_LIFECYCLE 0x00000001u
+@@ -1173,14 +1173,18 @@ typedef void mbedtls_ssl_async_cancel_t(mbedtls_ssl_context *ssl);
+ /** The backend can own server-side TLS 1.3 ECDHE key generation. */
+ #define MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND_CAP_ECDHE               0x00000020u
+ 
+-/** Capabilities known by API revision 4. */
++/** The backend can derive TLS 1.3 resumption material. */
++#define MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND_CAP_RESUMPTION          0x00000040u
++
++/** Capabilities known by API revision 5. */
+ #define MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND_CAP_MASK \
+     (MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND_CAP_CONNECTION_LIFECYCLE | \
+      MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND_CAP_TRANSFORM_LIFECYCLE  | \
+      MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND_CAP_RECORD_AEAD          | \
+      MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND_CAP_KEY_SCHEDULE         | \
+      MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND_CAP_FINISHED             | \
+-     MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND_CAP_ECDHE)
++     MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND_CAP_ECDHE                | \
++     MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND_CAP_RESUMPTION)
+ 
+ /**
+  * \brief Initialize backend state for one SSL connection.
+@@ -1300,6 +1304,9 @@ typedef int mbedtls_ssl_tls13_crypto_backend_handshake_keys_t(
+     void *connection_data,
+     uint16_t ciphersuite,
+     uint16_t tls_version,
++    const unsigned char *psk,
++    size_t psk_len,
++    int psk_type,
+     const unsigned char *shared_secret,
+     size_t shared_secret_len,
+     const unsigned char *peer_public_key,
+@@ -1356,6 +1363,46 @@ typedef int mbedtls_ssl_tls13_crypto_backend_finished_t(
+     size_t verify_data_size,
+     size_t *verify_data_len);
+ 
++/**
++ * \brief Derive TLS 1.3 resumption master secret from backend-owned
++ *        application master secret.
++ *
++ * API revision 5 uses this callback as Scenario D4. The backend derives
++ * resumption master secret after ClientFinished so TLS 1.3 NewSessionTicket
++ * generation can be exercised with the D backend. The output is returned to
++ * Mbed TLS for compatibility with its existing ticket serialization path.
++ */
++typedef int mbedtls_ssl_tls13_crypto_backend_resumption_master_t(
++    mbedtls_ssl_context *ssl,
++    void *config_data,
++    void *connection_data,
++    uint16_t ciphersuite,
++    uint16_t tls_version,
++    const unsigned char *transcript,
++    size_t transcript_len,
++    unsigned char *resumption_master,
++    size_t resumption_master_size,
++    size_t *resumption_master_len);
++
++/**
++ * \brief Derive the ticket PSK for one TLS 1.3 NewSessionTicket.
++ *
++ * API revision 5 uses this callback as Scenario D4. The backend expands the
++ * backend-derived resumption master secret with the ticket nonce and returns
++ * the PSK to Mbed TLS for compatibility with the existing ticket callback.
++ */
++typedef int mbedtls_ssl_tls13_crypto_backend_resumption_psk_t(
++    mbedtls_ssl_context *ssl,
++    void *config_data,
++    void *connection_data,
++    uint16_t ciphersuite,
++    uint16_t tls_version,
++    const unsigned char *ticket_nonce,
++    size_t ticket_nonce_len,
++    unsigned char *resumption_psk,
++    size_t resumption_psk_size,
++    size_t *resumption_psk_len);
++
+ /**
+  * \brief Application-provided TLS 1.3 cryptographic backend.
+  *
+@@ -1389,6 +1436,10 @@ typedef struct mbedtls_ssl_tls13_crypto_backend {
+         *finished;
+     mbedtls_ssl_tls13_crypto_backend_server_key_share_t
+         *server_key_share;
++    mbedtls_ssl_tls13_crypto_backend_resumption_master_t
++        *resumption_master;
++    mbedtls_ssl_tls13_crypto_backend_resumption_psk_t
++        *resumption_psk;
+ } mbedtls_ssl_tls13_crypto_backend;
+ 
+ #endif /* MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND */
+diff --git a/library/ssl_tls.c b/library/ssl_tls.c
+index ae482e2425..d2b66b66d0 100644
+--- a/library/ssl_tls.c
++++ b/library/ssl_tls.c
+@@ -3231,7 +3231,13 @@ int mbedtls_ssl_conf_tls13_crypto_backend(
+             MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND_CAP_ECDHE) != 0 &&
+          ((capabilities &
+             MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND_CAP_KEY_SCHEDULE) == 0 ||
+-          backend->server_key_share == NULL))) {
++          backend->server_key_share == NULL)) ||
++        ((capabilities &
++            MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND_CAP_RESUMPTION) != 0 &&
++         ((capabilities &
++            MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND_CAP_KEY_SCHEDULE) == 0 ||
++          backend->resumption_master == NULL ||
++          backend->resumption_psk == NULL))) {
+         return MBEDTLS_ERR_SSL_BAD_INPUT_DATA;
+     }
+ 
+diff --git a/library/ssl_tls13_keys.c b/library/ssl_tls13_keys.c
+index 41d332e259..ef75f73931 100644
+--- a/library/ssl_tls13_keys.c
++++ b/library/ssl_tls13_keys.c
+@@ -2009,12 +2009,27 @@ static int ssl_tls13_generate_handshake_transform_backend(
+     size_t transcript_len = 0;
+     unsigned char *shared_secret = NULL;
+     size_t shared_secret_len = 0;
++    unsigned char *psk = NULL;
++    size_t psk_len = 0;
++    int psk_type = MBEDTLS_SSL_TLS1_3_PSK_RESUMPTION;
+     void *transform_data = NULL;
+     const mbedtls_ssl_tls13_crypto_backend *backend =
+         ssl->conf->tls13_crypto_backend;
+ 
+     MBEDTLS_SSL_DEBUG_MSG(2, ("=> TLS 1.3 backend handshake key schedule"));
+ 
++#if defined(MBEDTLS_SSL_TLS1_3_KEY_EXCHANGE_MODE_SOME_PSK_ENABLED)
++    if (mbedtls_ssl_tls13_key_exchange_mode_with_psk(ssl)) {
++        ret = mbedtls_ssl_tls13_export_handshake_psk(ssl, &psk, &psk_len);
++        if (ret != 0) {
++            MBEDTLS_SSL_DEBUG_RET(1,
++                                  "mbedtls_ssl_tls13_export_handshake_psk",
++                                  ret);
++            goto cleanup;
++        }
++    }
++#endif
++
+     ret = ssl_tls13_backend_compute_shared_secret(ssl,
+                                                   &shared_secret,
+                                                   &shared_secret_len);
+@@ -2039,6 +2054,7 @@ static int ssl_tls13_generate_handshake_transform_backend(
+         mbedtls_ssl_get_tls13_crypto_backend_connection_data(ssl),
+         (uint16_t) ssl->handshake->ciphersuite_info->id,
+         (uint16_t) MBEDTLS_SSL_VERSION_TLS1_3,
++        psk, psk_len, psk_type,
+         shared_secret, shared_secret_len,
+         ssl->handshake->xxdh_psa_peerkey,
+         ssl->handshake->xxdh_psa_peerkey_len,
+@@ -2065,6 +2081,12 @@ cleanup:
+     if (shared_secret != NULL) {
+         mbedtls_zeroize_and_free(shared_secret, shared_secret_len);
+     }
++#if defined(MBEDTLS_USE_PSA_CRYPTO) && \
++    defined(MBEDTLS_SSL_TLS1_3_KEY_EXCHANGE_MODE_SOME_PSK_ENABLED)
++    if (psk != NULL) {
++        mbedtls_zeroize_and_free(psk, psk_len);
++    }
++#endif
+     mbedtls_platform_zeroize(transcript, sizeof(transcript));
+     return ret;
+ }
+@@ -2218,6 +2240,38 @@ int mbedtls_ssl_tls13_compute_resumption_master_secret(mbedtls_ssl_context *ssl)
+         return ret;
+     }
+ 
++#if defined(MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND)
++    if (ssl_tls13_backend_has_capability(
++            ssl, MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND_CAP_RESUMPTION) != 0) {
++        size_t rms_len = 0;
++        size_t hash_len = PSA_HASH_LENGTH(mbedtls_md_psa_alg_from_type(md_type));
++
++        ret = ssl->conf->tls13_crypto_backend->resumption_master(
++            ssl,
++            ssl->conf->p_tls13_crypto_backend,
++            mbedtls_ssl_get_tls13_crypto_backend_connection_data(ssl),
++            (uint16_t) ssl->handshake->ciphersuite_info->id,
++            (uint16_t) MBEDTLS_SSL_VERSION_TLS1_3,
++            transcript, transcript_len,
++            ssl->session_negotiate->app_secrets.resumption_master_secret,
++            sizeof(ssl->session_negotiate->app_secrets.resumption_master_secret),
++            &rms_len);
++        if (ret != 0) {
++            MBEDTLS_SSL_DEBUG_RET(1,
++                                  "TLS 1.3 backend resumption master", ret);
++            return ret;
++        }
++        if (rms_len != hash_len) {
++            return MBEDTLS_ERR_SSL_INTERNAL_ERROR;
++        }
++        MBEDTLS_SSL_DEBUG_BUF(
++            4, "Resumption master secret",
++            ssl->session_negotiate->app_secrets.resumption_master_secret,
++            hash_len);
++        goto erase_master_secrets;
++    }
++#endif /* MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND */
++
+     ret = mbedtls_ssl_tls13_derive_resumption_master_secret(
+         mbedtls_md_psa_alg_from_type(md_type),
+         handshake->tls13_master_secrets.app,
+@@ -2227,6 +2281,7 @@ int mbedtls_ssl_tls13_compute_resumption_master_secret(mbedtls_ssl_context *ssl)
+         return ret;
+     }
+ 
++erase_master_secrets:
+     /* Erase master secrets */
+     mbedtls_platform_zeroize(&handshake->tls13_master_secrets,
+                              sizeof(handshake->tls13_master_secrets));
+diff --git a/library/ssl_tls13_server.c b/library/ssl_tls13_server.c
+index 693edc7b0b..d4ace26568 100644
+--- a/library/ssl_tls13_server.c
++++ b/library/ssl_tls13_server.c
+@@ -3221,6 +3221,39 @@ static int ssl_tls13_prepare_new_session_ticket(mbedtls_ssl_context *ssl,
+     session->resumption_key_len = hash_length;
+     session->ciphersuite = ciphersuite_info->id;
+ 
++#if defined(MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND)
++    if (ssl->conf != NULL &&
++        ssl->conf->tls13_crypto_backend != NULL &&
++        (ssl->conf->tls13_crypto_backend->capabilities &
++            MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND_CAP_RESUMPTION) != 0) {
++        size_t psk_len = 0;
++
++        ret = ssl->conf->tls13_crypto_backend->resumption_psk(
++            ssl,
++            ssl->conf->p_tls13_crypto_backend,
++            mbedtls_ssl_get_tls13_crypto_backend_connection_data(ssl),
++            (uint16_t) session->ciphersuite,
++            (uint16_t) MBEDTLS_SSL_VERSION_TLS1_3,
++            ticket_nonce, ticket_nonce_size,
++            session->resumption_key, sizeof(session->resumption_key),
++            &psk_len);
++        if (ret != 0) {
++            MBEDTLS_SSL_DEBUG_RET(2,
++                                  "Creating backend ticket-resumed PSK failed",
++                                  ret);
++            return ret;
++        }
++        if (psk_len != (size_t) hash_length) {
++            return MBEDTLS_ERR_SSL_INTERNAL_ERROR;
++        }
++        session->resumption_key_len = psk_len;
++        MBEDTLS_SSL_DEBUG_BUF(3, "Ticket-resumed PSK",
++                              session->resumption_key,
++                              session->resumption_key_len);
++        goto resumption_key_ready;
++    }
++#endif /* MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND */
++
+     /* Compute resumption key
+      *
+      *  HKDF-Expand-Label( resumption_master_secret,
+@@ -3246,6 +3279,8 @@ static int ssl_tls13_prepare_new_session_ticket(mbedtls_ssl_context *ssl,
+                           session->resumption_key,
+                           session->resumption_key_len);
+ 
++resumption_key_ready:
++
+     MBEDTLS_SSL_DEBUG_BUF(3, "resumption_master_secret",
+                           session->app_secrets.resumption_master_secret,
+                           hash_length);
+-- 
+2.47.3
+

@@ -1,0 +1,4 @@
+FILESEXTRAPATHS:prepend := "${THISDIR}/${PN}:"
+
+SRC_URI += "file://0001-Enable-MBEDTLS_SSL_ASYNC_PRIVATE.patch"
+

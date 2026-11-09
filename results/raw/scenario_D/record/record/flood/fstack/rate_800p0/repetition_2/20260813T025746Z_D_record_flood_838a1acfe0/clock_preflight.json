@@ -1,0 +1,98 @@
+{
+  "errors": [],
+  "hosts": {
+    "dut": {
+      "host": "dut",
+      "measured_utc": "2026-08-13T02:57:46.788511765Z",
+      "method": "established-ssh-request-reply",
+      "offset_ms": 1.012992,
+      "round_trip_ms": 6.474531,
+      "samples": [
+        {
+          "offset_ms": 0.983296,
+          "round_trip_ms": 7.902598,
+          "uncertainty_ms": 3.951299
+        },
+        {
+          "offset_ms": 1.130752,
+          "round_trip_ms": 7.422422,
+          "uncertainty_ms": 3.711211
+        },
+        {
+          "offset_ms": 1.110272,
+          "round_trip_ms": 6.840662,
+          "uncertainty_ms": 3.420331
+        },
+        {
+          "offset_ms": 1.012992,
+          "round_trip_ms": 6.474531,
+          "uncertainty_ms": 3.2372655
+        },
+        {
+          "offset_ms": 0.894976,
+          "round_trip_ms": 7.114583,
+          "uncertainty_ms": 3.5572915
+        },
+        {
+          "offset_ms": 0.961024,
+          "round_trip_ms": 6.60645,
+          "uncertainty_ms": 3.303225
+        },
+        {
+          "offset_ms": 1.020416,
+          "round_trip_ms": 6.49874,
+          "uncertainty_ms": 3.24937
+        }
+      ],
+      "uncertainty_ms": 3.2372655
+    },
+    "loadgen": {
+      "host": "loadgen",
+      "measured_utc": "2026-08-13T02:57:47.374004700Z",
+      "method": "established-ssh-request-reply",
+      "offset_ms": 0.429312,
+      "round_trip_ms": 2.788424,
+      "samples": [
+        {
+          "offset_ms": 0.429312,
+          "round_trip_ms": 2.788424,
+          "uncertainty_ms": 1.394212
+        },
+        {
+          "offset_ms": 0.478976,
+          "round_trip_ms": 3.076596,
+          "uncertainty_ms": 1.538298
+        },
+        {
+          "offset_ms": 0.469504,
+          "round_trip_ms": 3.22414,
+          "uncertainty_ms": 1.61207
+        },
+        {
+          "offset_ms": 0.524544,
+          "round_trip_ms": 3.23139,
+          "uncertainty_ms": 1.615695
+        },
+        {
+          "offset_ms": 0.537344,
+          "round_trip_ms": 3.367309,
+          "uncertainty_ms": 1.6836545
+        },
+        {
+          "offset_ms": 0.537856,
+          "round_trip_ms": 3.738816,
+          "uncertainty_ms": 1.869408
+        },
+        {
+          "offset_ms": 0.534528,
+          "round_trip_ms": 4.241158,
+          "uncertainty_ms": 2.120579
+        }
+      ],
+      "uncertainty_ms": 1.394212
+    }
+  },
+  "max_uncertainty_ms": 25.0,
+  "profile": "measurement",
+  "threshold_ms": 20.0
+}

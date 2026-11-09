@@ -1,0 +1,13 @@
+{
+  "errors": [
+    "generator exit code 4",
+    "generator final phase 'failed', expected 'done'",
+    "generator stats ended before the configured run duration",
+    "generator timeline current_phase='failed', expected 'done'",
+    "generator timeline run_end_reason='tool-exited', expected 'duration-complete'",
+    "generator timeline timestamps are not in lifecycle order"
+  ],
+  "status": "FAIL",
+  "validated_utc": "2026-08-13T16:10:35.606003191Z",
+  "warnings": []
+}

@@ -1,0 +1,56 @@
+# TLS load generator configuration (strict key=value format)
+# Run-specific identity/rates can be overridden on the CLI.
+
+target.address=192.0.2.150
+target.port=4433
+# Used by setup/preflight validation. F-Stack resolves the same-subnet neighbor by ARP.
+target.mac=02:00:00:00:00:50
+
+network.source_address=192.0.2.50
+network.netmask=255.255.255.0
+network.interface=CHANGE_ME_DATA_INTERFACE
+network.mtu=1500
+network.tcp_nodelay=true
+
+tls.ca_file=~/certificates/server.crt
+tls.server_name=tls-echo-server
+tls.verify_peer=true
+tls.verify_hostname=false
+tls.ciphersuite=TLS_AES_128_GCM_SHA256
+tls.group=P-256
+tls.signature_algorithm=ecdsa_secp256r1_sha256
+
+run.scenario=A
+run.workload=full-handshake
+run.mode=benign
+run.rate_per_s=10
+run.duration_s=30
+run.max_inflight=512
+run.max_release_burst=4096
+run.drain_timeout_ms=10000
+
+timeout.tcp_connect_ms=5000
+timeout.tls_handshake_ms=5000
+timeout.io_ms=5000
+
+payload.size=1024
+payload.pattern_hex=a5
+full.echo_after_handshake=false
+
+# reuse_seed keeps one validated ticket usable across failed attempts.
+# fresh_pool consumes a ticket and requires a newly issued ticket per successful resumption.
+resumption.session_policy=reuse_seed
+resumption.pool_size=32
+resumption.wait_for_fresh_ticket=true
+
+record.connections=32
+record.max_pending_releases=4096
+record.reconnect=true
+record.reconnect_backoff_ms=1000
+
+output.directory=./results
+output.run_id=
+output.stdout_progress=true
+
+fstack.conf=./config/f-stack.conf
+fstack.proc_id=0

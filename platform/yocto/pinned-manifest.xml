@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<manifest>
+  <remote name="community" fetch="https://github.com/Freescale"/>
+  <remote name="imx" fetch="https://github.com/nxp-imx"/>
+  <remote name="imx-support" fetch="https://github.com/nxp-imx-support"/>
+  <remote name="kraj" fetch="https://github.com/kraj"/>
+  <remote name="oe" fetch="https://github.com/openembedded"/>
+  <remote name="ossystems" fetch="https://github.com/OSSystems"/>
+  <remote name="qt" fetch="https://github.com/YoeDistro"/>
+  <remote name="timesys" fetch="https://github.com/TimesysGit"/>
+  <remote name="yp" fetch="https://git.yoctoproject.org"/>
+  
+  <default revision="styhead" sync-j="4"/>
+  
+  <project name="fsl-community-bsp-base" path="sources/base" remote="community" revision="84df0b1ff416c6739472f7f7eadff04fa90d38f6" upstream="master">
+    <linkfile src="README" dest="README"/>
+    <linkfile src="setup-environment" dest="setup-environment"/>
+  </project>
+  <project name="meta-arm" path="sources/meta-arm" remote="yp" revision="0ef5fd96829b68977e6eb0d3b5e092283ce89f6f" upstream="styhead"/>
+  <project name="meta-browser" path="sources/meta-browser" remote="ossystems" revision="f988d616d37ddf160d3d747ed54d0a66d549f499"/>
+  <project name="meta-clang" path="sources/meta-clang" remote="kraj" revision="c709a5196f1e8654425b43b478064395386c36d4" upstream="styhead"/>
+  <project name="meta-freescale" path="sources/meta-freescale" remote="community" revision="8cc3bb0ff75e38becfd0a9eced0b7dc22cb3f86c" upstream="master"/>
+  <project name="meta-freescale-3rdparty" path="sources/meta-freescale-3rdparty" remote="community" revision="774ca54bc00cc6c55fd92163441716d4c32f732f" upstream="master"/>
+  <project name="meta-freescale-distro" path="sources/meta-freescale-distro" remote="community" revision="f7be03965e7a0563761a73d5f3988cd9be40d3e9" upstream="master"/>
+  <project name="meta-imx" path="sources/meta-imx" remote="imx" revision="8da2e3bd31dfe705329044bfcda34dd46d1ab685" upstream="styhead-6.12.3-1.0.0" dest-branch="refs/tags/rel_imx_6.12.3_1.0.0">
+    <linkfile src="tools/imx-setup-release.sh" dest="imx-setup-release.sh"/>
+    <linkfile src="README" dest="README-IMXBSP"/>
+  </project>
+  <project name="meta-nxp-connectivity" path="sources/meta-nxp-connectivity" remote="imx" revision="9728012463cb9c99bf766801a13edc07732a9195" upstream="imx_matter_2024_q4-post" dest-branch="refs/tags/rel_imx_6.12.3-1.0.0"/>
+  <project name="meta-nxp-demo-experience" path="sources/meta-nxp-demo-experience" remote="imx-support" revision="1d3d7d4fb9c738c09981062e7df4ae025d543f89" upstream="styhead-6.12.3-1.0.0" dest-branch="refs/tags/rel_imx_6.12.3_1.0.0"/>
+  <project name="meta-openembedded" path="sources/meta-openembedded" remote="oe" revision="5d54a52fbeb69dba7b8ae11db98af4813951fa61" upstream="styhead"/>
+  <project name="meta-qt6" path="sources/meta-qt6" remote="qt" revision="f4ef1331f0cc49bd4aa1e1aace6dc7f000b9651e" upstream="6.8.1"/>
+  <project name="meta-security" path="sources/meta-security" remote="yp" revision="e2c44c8b5d02591ec0be3266d6667e16725bcb92" upstream="styhead"/>
+  <project name="meta-timesys" path="sources/meta-timesys" remote="timesys" revision="4d2a0309ba6b78d4ad877cf53670de87db7d5fb9" upstream="master"/>
+  <project name="meta-virtualization" path="sources/meta-virtualization" remote="yp" revision="9e9f60e959f3710fb7a16b9829d950c3d94c0d4a" upstream="styhead"/>
+  <project name="poky" path="sources/poky" remote="yp" revision="bca4068948e4383cc18a24a3c224bbc339f7de2a" upstream="styhead"/>
+</manifest>

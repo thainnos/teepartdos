@@ -1,0 +1,57 @@
+{
+  "campaign_type": "repeated",
+  "campaigns": {
+    "A": {
+      "campaign_id": "A-tls-flood-medium-final-v1",
+      "manifest_path": "_campaigns/ABCDE-tls-flood-medium-final-v1/campaigns/A-tls-flood-medium-final-v1/campaign_manifest.json",
+      "status": "complete",
+      "updated_utc": "2026-08-13T10:49:42.100954233Z"
+    },
+    "B": {
+      "campaign_id": "B-tls-flood-medium-final-v1",
+      "manifest_path": "_campaigns/ABCDE-tls-flood-medium-final-v1/campaigns/B-tls-flood-medium-final-v1/campaign_manifest.json",
+      "status": "complete",
+      "updated_utc": "2026-08-13T10:49:42.419558530Z"
+    },
+    "C": {
+      "campaign_id": "C-tls-flood-medium-final-v1",
+      "manifest_path": "_campaigns/ABCDE-tls-flood-medium-final-v1/campaigns/C-tls-flood-medium-final-v1/campaign_manifest.json",
+      "status": "complete",
+      "updated_utc": "2026-08-13T10:49:42.733502537Z"
+    },
+    "D": {
+      "campaign_id": "D-tls-flood-medium-final-v1",
+      "manifest_path": "_campaigns/ABCDE-tls-flood-medium-final-v1/campaigns/D-tls-flood-medium-final-v1/campaign_manifest.json",
+      "status": "complete",
+      "updated_utc": "2026-08-13T10:49:43.048972571Z"
+    },
+    "E": {
+      "campaign_id": "E-tls-flood-medium-final-v1",
+      "manifest_path": "_campaigns/ABCDE-tls-flood-medium-final-v1/campaigns/E-tls-flood-medium-final-v1/campaign_manifest.json",
+      "status": "complete",
+      "updated_utc": "2026-08-13T10:49:43.363164248Z"
+    }
+  },
+  "complete_scenarios": [
+    "A",
+    "B",
+    "C",
+    "D",
+    "E"
+  ],
+  "created_utc": "2026-08-12T21:53:13.041836390Z",
+  "expected_scenarios": [
+    "A",
+    "B",
+    "C",
+    "D",
+    "E"
+  ],
+  "generator_backend": "fstack",
+  "generator_mode": "flood",
+  "missing_or_incomplete_scenarios": [],
+  "overall_campaign_id": "ABCDE-tls-flood-medium-final-v1",
+  "schema_version": 1,
+  "status": "complete",
+  "updated_utc": "2026-08-13T10:49:43.376039808Z"
+}

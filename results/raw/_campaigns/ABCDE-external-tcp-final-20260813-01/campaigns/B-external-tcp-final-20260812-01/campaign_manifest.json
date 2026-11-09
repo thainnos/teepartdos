@@ -1,0 +1,261 @@
+{
+  "ambiguous_point_ids": [],
+  "campaign_id": "B-external-tcp-final-20260812-01",
+  "campaign_type": "repeated",
+  "created_utc": "2026-08-13T14:27:12.759221039Z",
+  "description": "Final fixed external TCP-level stress condition; five independent repetitions",
+  "execution_finished": true,
+  "expected_points": [
+    {
+      "generator_backend": "posix",
+      "generator_connections": 32,
+      "generator_duration_s": 120,
+      "generator_max_inflight": 4096,
+      "generator_mode": "flood",
+      "generator_rate": 0.0,
+      "generator_workload": "tcp-syn",
+      "point_id": "B__full-handshake__tcp-syn__flood__posix__rate_0__rep_1",
+      "pre_generation_s": 20,
+      "profile": "measurement",
+      "reference_duration_s": 300,
+      "reference_workload": "full-handshake",
+      "repetition": 1,
+      "scenario": "B",
+      "start_delay_s": 15
+    },
+    {
+      "generator_backend": "posix",
+      "generator_connections": 32,
+      "generator_duration_s": 120,
+      "generator_max_inflight": 4096,
+      "generator_mode": "flood",
+      "generator_rate": 0.0,
+      "generator_workload": "tcp-syn",
+      "point_id": "B__full-handshake__tcp-syn__flood__posix__rate_0__rep_2",
+      "pre_generation_s": 20,
+      "profile": "measurement",
+      "reference_duration_s": 300,
+      "reference_workload": "full-handshake",
+      "repetition": 2,
+      "scenario": "B",
+      "start_delay_s": 15
+    },
+    {
+      "generator_backend": "posix",
+      "generator_connections": 32,
+      "generator_duration_s": 120,
+      "generator_max_inflight": 4096,
+      "generator_mode": "flood",
+      "generator_rate": 0.0,
+      "generator_workload": "tcp-syn",
+      "point_id": "B__full-handshake__tcp-syn__flood__posix__rate_0__rep_3",
+      "pre_generation_s": 20,
+      "profile": "measurement",
+      "reference_duration_s": 300,
+      "reference_workload": "full-handshake",
+      "repetition": 3,
+      "scenario": "B",
+      "start_delay_s": 15
+    },
+    {
+      "generator_backend": "posix",
+      "generator_connections": 32,
+      "generator_duration_s": 120,
+      "generator_max_inflight": 4096,
+      "generator_mode": "flood",
+      "generator_rate": 0.0,
+      "generator_workload": "tcp-syn",
+      "point_id": "B__full-handshake__tcp-syn__flood__posix__rate_0__rep_4",
+      "pre_generation_s": 20,
+      "profile": "measurement",
+      "reference_duration_s": 300,
+      "reference_workload": "full-handshake",
+      "repetition": 4,
+      "scenario": "B",
+      "start_delay_s": 15
+    },
+    {
+      "generator_backend": "posix",
+      "generator_connections": 32,
+      "generator_duration_s": 120,
+      "generator_max_inflight": 4096,
+      "generator_mode": "flood",
+      "generator_rate": 0.0,
+      "generator_workload": "tcp-syn",
+      "point_id": "B__full-handshake__tcp-syn__flood__posix__rate_0__rep_5",
+      "pre_generation_s": 20,
+      "profile": "measurement",
+      "reference_duration_s": 300,
+      "reference_workload": "full-handshake",
+      "repetition": 5,
+      "scenario": "B",
+      "start_delay_s": 15
+    }
+  ],
+  "finished_utc": "2026-08-13T20:13:58.348747264Z",
+  "generator_backend": "posix",
+  "generator_mode": "flood",
+  "matrix_file": "campaign_matrix.toml",
+  "matrix_sha256": "c096bc376e07da5acc77ba1fe3a3743abbd45b870c19288264bffe21e4a4be6c",
+  "missing_point_ids": [],
+  "overall_campaign_id": "ABCDE-external-tcp-final-20260813-01",
+  "runs": [
+    {
+      "command_returncode": 1,
+      "point_id": "B__full-handshake__tcp-syn__flood__posix__rate_0__rep_1",
+      "recorded_utc": "2026-08-13T15:25:07.973024952Z",
+      "result_path": "scenario_B/full-handshake/tcp-syn/flood/posix/rate_0p0/repetition_1/20260813T142713Z_B_full-handshake_flood_256ad1b9ae",
+      "run_id": "20260813T142713Z_B_full-handshake_flood_256ad1b9ae",
+      "selection": "superseded",
+      "superseded_by_run_id": "20260813T152508Z_B_full-handshake_flood_d1da150c4f",
+      "superseded_utc": "2026-08-13T15:31:39.286227367Z",
+      "validation_errors": [
+        "validation.json missing"
+      ],
+      "validation_status": "MISSING",
+      "validation_warnings": []
+    },
+    {
+      "command_returncode": 1,
+      "point_id": "B__full-handshake__tcp-syn__flood__posix__rate_0__rep_1",
+      "recorded_utc": "2026-08-13T15:31:39.286270118Z",
+      "result_path": "scenario_B/full-handshake/tcp-syn/flood/posix/rate_0p0/repetition_1/20260813T152508Z_B_full-handshake_flood_d1da150c4f",
+      "run_id": "20260813T152508Z_B_full-handshake_flood_d1da150c4f",
+      "selection": "superseded",
+      "superseded_by_run_id": "20260813T153139Z_B_full-handshake_flood_a5f0492816",
+      "superseded_utc": "2026-08-13T15:50:13.909269109Z",
+      "validation_errors": [
+        "validation.json missing"
+      ],
+      "validation_status": "MISSING",
+      "validation_warnings": []
+    },
+    {
+      "command_returncode": 1,
+      "point_id": "B__full-handshake__tcp-syn__flood__posix__rate_0__rep_1",
+      "recorded_utc": "2026-08-13T15:50:13.909312068Z",
+      "result_path": "scenario_B/full-handshake/tcp-syn/flood/posix/rate_0p0/repetition_1/20260813T153139Z_B_full-handshake_flood_a5f0492816",
+      "run_id": "20260813T153139Z_B_full-handshake_flood_a5f0492816",
+      "selection": "superseded",
+      "superseded_by_run_id": "20260813T155014Z_B_full-handshake_flood_1c4d2ff654",
+      "superseded_utc": "2026-08-13T16:10:36.510108244Z",
+      "validation_errors": [
+        "validation.json missing"
+      ],
+      "validation_status": "MISSING",
+      "validation_warnings": []
+    },
+    {
+      "command_returncode": 1,
+      "point_id": "B__full-handshake__tcp-syn__flood__posix__rate_0__rep_1",
+      "recorded_utc": "2026-08-13T16:10:36.510150536Z",
+      "result_path": "scenario_B/full-handshake/tcp-syn/flood/posix/rate_0p0/repetition_1/20260813T155014Z_B_full-handshake_flood_1c4d2ff654",
+      "run_id": "20260813T155014Z_B_full-handshake_flood_1c4d2ff654",
+      "selection": "superseded",
+      "superseded_by_run_id": "20260813T161037Z_B_full-handshake_flood_df51ace8d2",
+      "superseded_utc": "2026-08-13T16:54:08.904935255Z",
+      "validation_errors": [
+        "validation.json missing"
+      ],
+      "validation_status": "MISSING",
+      "validation_warnings": []
+    },
+    {
+      "command_returncode": 1,
+      "point_id": "B__full-handshake__tcp-syn__flood__posix__rate_0__rep_1",
+      "recorded_utc": "2026-08-13T16:54:08.904979047Z",
+      "result_path": "scenario_B/full-handshake/tcp-syn/flood/posix/rate_0p0/repetition_1/20260813T161037Z_B_full-handshake_flood_df51ace8d2",
+      "run_id": "20260813T161037Z_B_full-handshake_flood_df51ace8d2",
+      "selection": "superseded",
+      "superseded_by_run_id": "20260813T165409Z_B_full-handshake_flood_47819c36e4",
+      "superseded_utc": "2026-08-13T17:20:21.399286650Z",
+      "validation_errors": [
+        "validation.json missing"
+      ],
+      "validation_status": "MISSING",
+      "validation_warnings": []
+    },
+    {
+      "command_returncode": 1,
+      "point_id": "B__full-handshake__tcp-syn__flood__posix__rate_0__rep_1",
+      "recorded_utc": "2026-08-13T17:20:21.399329735Z",
+      "result_path": "scenario_B/full-handshake/tcp-syn/flood/posix/rate_0p0/repetition_1/20260813T165409Z_B_full-handshake_flood_47819c36e4",
+      "run_id": "20260813T165409Z_B_full-handshake_flood_47819c36e4",
+      "selection": "superseded",
+      "superseded_by_run_id": "20260813T172021Z_B_full-handshake_flood_3e94481a03",
+      "superseded_utc": "2026-08-13T17:25:46.159931926Z",
+      "validation_errors": [
+        "validation.json missing"
+      ],
+      "validation_status": "MISSING",
+      "validation_warnings": []
+    },
+    {
+      "command_returncode": 0,
+      "point_id": "B__full-handshake__tcp-syn__flood__posix__rate_0__rep_1",
+      "recorded_utc": "2026-08-13T17:25:46.159974594Z",
+      "result_path": "scenario_B/full-handshake/tcp-syn/flood/posix/rate_0p0/repetition_1/20260813T172021Z_B_full-handshake_flood_3e94481a03",
+      "run_id": "20260813T172021Z_B_full-handshake_flood_3e94481a03",
+      "selection": "selected",
+      "validation_errors": [],
+      "validation_status": "PASS",
+      "validation_warnings": []
+    },
+    {
+      "command_returncode": 0,
+      "point_id": "B__full-handshake__tcp-syn__flood__posix__rate_0__rep_2",
+      "recorded_utc": "2026-08-13T17:31:09.706829714Z",
+      "result_path": "scenario_B/full-handshake/tcp-syn/flood/posix/rate_0p0/repetition_2/20260813T172546Z_B_full-handshake_flood_5791dc6ed2",
+      "run_id": "20260813T172546Z_B_full-handshake_flood_5791dc6ed2",
+      "selection": "selected",
+      "validation_errors": [],
+      "validation_status": "PASS",
+      "validation_warnings": []
+    },
+    {
+      "command_returncode": 0,
+      "point_id": "B__full-handshake__tcp-syn__flood__posix__rate_0__rep_3",
+      "recorded_utc": "2026-08-13T17:36:33.044857629Z",
+      "result_path": "scenario_B/full-handshake/tcp-syn/flood/posix/rate_0p0/repetition_3/20260813T173110Z_B_full-handshake_flood_823e80fcd8",
+      "run_id": "20260813T173110Z_B_full-handshake_flood_823e80fcd8",
+      "selection": "selected",
+      "validation_errors": [],
+      "validation_status": "PASS",
+      "validation_warnings": []
+    },
+    {
+      "command_returncode": 0,
+      "point_id": "B__full-handshake__tcp-syn__flood__posix__rate_0__rep_4",
+      "recorded_utc": "2026-08-13T17:41:56.397348561Z",
+      "result_path": "scenario_B/full-handshake/tcp-syn/flood/posix/rate_0p0/repetition_4/20260813T173633Z_B_full-handshake_flood_5e8269384a",
+      "run_id": "20260813T173633Z_B_full-handshake_flood_5e8269384a",
+      "selection": "selected",
+      "validation_errors": [],
+      "validation_status": "PASS",
+      "validation_warnings": []
+    },
+    {
+      "command_returncode": 0,
+      "point_id": "B__full-handshake__tcp-syn__flood__posix__rate_0__rep_5",
+      "recorded_utc": "2026-08-13T17:47:19.950851714Z",
+      "result_path": "scenario_B/full-handshake/tcp-syn/flood/posix/rate_0p0/repetition_5/20260813T174157Z_B_full-handshake_flood_10b5729f17",
+      "run_id": "20260813T174157Z_B_full-handshake_flood_10b5729f17",
+      "selection": "selected",
+      "validation_errors": [],
+      "validation_status": "PASS",
+      "validation_warnings": []
+    }
+  ],
+  "scenario": "B",
+  "schema_version": 1,
+  "status": "complete",
+  "summary": {
+    "ambiguous_points": 0,
+    "expected_points": 5,
+    "invalid_runs": 0,
+    "missing_points": 0,
+    "selected_points": 5,
+    "superseded_runs": 6
+  },
+  "updated_utc": "2026-08-13T20:13:58.348872767Z"
+}

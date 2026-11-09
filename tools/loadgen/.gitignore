@@ -1,0 +1,10 @@
+/bin/
+/build/
+/results/
+/tests/.tmp/
+/tests/.scheduler-stall/
+/config/generator.conf
+/config/f-stack.conf
+/state/*.runtime
+*.log
+*.pcap

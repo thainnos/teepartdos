@@ -1,0 +1,16 @@
+{
+  "errors": [
+    "reference exit code -13",
+    "reference CSV ended too early: maximum scheduled_elapsed_us 104000000 is below 298000000",
+    "generator stats ended before the configured run duration",
+    "generator timeline run_end_reason='stop-requested', expected 'duration-complete'",
+    "generator timeline timestamps are not in lifecycle order",
+    "generator PHASE_RUN ended after reference client",
+    "generator process ended after reference client"
+  ],
+  "status": "FAIL",
+  "validated_utc": "2026-08-13T07:31:14.956141012Z",
+  "warnings": [
+    "DUT accepted=8323 is below generator tcp_established_total=9023"
+  ]
+}

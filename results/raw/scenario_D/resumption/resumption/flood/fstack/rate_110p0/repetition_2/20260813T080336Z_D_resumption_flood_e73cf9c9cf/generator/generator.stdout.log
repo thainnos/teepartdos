@@ -1,0 +1,159 @@
+[dpdk]: lcore_mask=4
+[dpdk]: channel=2
+[dpdk]: promiscuous=1
+[dpdk]: numa_on=0
+[dpdk]: tso=0
+[dpdk]: vlan_strip=0
+[dpdk]: idle_sleep=0
+[dpdk]: pkt_tx_delay=0
+[dpdk]: port_list=0
+[dpdk]: allow=0000:01:00.0
+[dpdk]: file_prefix=tls_loadgen
+[port0]: addr=172.10.10.50
+[port0]: netmask=255.255.255.0
+[port0]: broadcast=172.10.10.255
+[port0]: gateway=172.10.10.1
+[port0]: lcore_list=2
+[freebsd.boot]: hz=100
+[freebsd.boot]: fd_reserve=1024
+[freebsd.boot]: kern.ipc.maxsockets=262144
+[freebsd.boot]: net.inet.tcp.syncache.hashsize=4096
+[freebsd.boot]: net.inet.tcp.syncache.bucketlimit=256
+[freebsd.boot]: net.inet.tcp.tcbhashsize=65536
+[freebsd.boot]: kern.ncallout=262144
+[freebsd.sysctl]: kern.ipc.somaxconn=32768
+[freebsd.sysctl]: net.inet.tcp.msl=2000
+[freebsd.sysctl]: net.inet.tcp.finwait2_timeout=5000
+[freebsd.sysctl]: net.inet.tcp.keepinit=5000
+[freebsd.sysctl]: net.inet.tcp.keepidle=30000
+[freebsd.sysctl]: net.inet.tcp.keepintvl=5000
+[freebsd.sysctl]: net.inet.tcp.delayed_ack=0
+f-stack -c4 -n2 --proc-type=primary --file-prefix=container-tls_loadgen --allow=0000:01:00.0 
+stats phase=prime elapsed=0.0 offered=0.0/s attempted=0.0/s completed=0.0/s active=16 sessions=16 fail_hs=0 fail_app=0 local_drop=0
+run_start backend=fstack scenario=D workload=resumption mode=flood rate=110.000 duration=120 max_inflight=4096
+stats phase=run elapsed=1.0 offered=111.0/s attempted=111.0/s completed=32.0/s active=79 sessions=32 fail_hs=0 fail_app=0 local_drop=0
+stats phase=run elapsed=2.0 offered=110.0/s attempted=110.0/s completed=37.0/s active=152 sessions=32 fail_hs=0 fail_app=0 local_drop=0
+stats phase=run elapsed=3.0 offered=110.0/s attempted=110.0/s completed=76.0/s active=186 sessions=32 fail_hs=0 fail_app=0 local_drop=0
+stats phase=run elapsed=4.0 offered=110.0/s attempted=110.0/s completed=0.0/s active=296 sessions=32 fail_hs=0 fail_app=0 local_drop=0
+stats phase=run elapsed=5.0 offered=110.0/s attempted=110.0/s completed=0.0/s active=383 sessions=32 fail_hs=0 fail_app=23 local_drop=0
+stats phase=run elapsed=6.0 offered=110.0/s attempted=110.0/s completed=147.0/s active=216 sessions=32 fail_hs=0 fail_app=153 local_drop=0
+stats phase=run elapsed=7.0 offered=110.0/s attempted=110.0/s completed=0.0/s active=326 sessions=32 fail_hs=0 fail_app=153 local_drop=0
+stats phase=run elapsed=8.0 offered=110.0/s attempted=110.0/s completed=108.0/s active=279 sessions=32 fail_hs=0 fail_app=202 local_drop=0
+stats phase=run elapsed=9.0 offered=110.0/s attempted=110.0/s completed=0.0/s active=387 sessions=32 fail_hs=0 fail_app=202 local_drop=0
+stats phase=run elapsed=10.0 offered=110.0/s attempted=110.0/s completed=18.0/s active=456 sessions=32 fail_hs=0 fail_app=225 local_drop=0
+stats phase=run elapsed=11.0 offered=110.0/s attempted=110.0/s completed=129.0/s active=304 sessions=32 fail_hs=0 fail_app=355 local_drop=0
+stats phase=run elapsed=12.0 offered=110.0/s attempted=110.0/s completed=0.0/s active=408 sessions=32 fail_hs=0 fail_app=355 local_drop=0
+stats phase=run elapsed=13.0 offered=110.0/s attempted=110.0/s completed=108.0/s active=361 sessions=32 fail_hs=0 fail_app=404 local_drop=0
+stats phase=run elapsed=14.0 offered=110.0/s attempted=110.0/s completed=0.0/s active=410 sessions=32 fail_hs=0 fail_app=404 local_drop=0
+stats phase=run elapsed=15.0 offered=110.0/s attempted=110.0/s completed=27.0/s active=470 sessions=32 fail_hs=0 fail_app=427 local_drop=0
+stats phase=run elapsed=16.0 offered=110.0/s attempted=110.0/s completed=121.0/s active=326 sessions=32 fail_hs=0 fail_app=557 local_drop=0
+stats phase=run elapsed=17.0 offered=110.0/s attempted=110.0/s completed=0.0/s active=419 sessions=32 fail_hs=0 fail_app=557 local_drop=0
+stats phase=run elapsed=18.0 offered=110.0/s attempted=110.0/s completed=108.0/s active=372 sessions=32 fail_hs=0 fail_app=606 local_drop=0
+stats phase=run elapsed=19.0 offered=110.0/s attempted=110.0/s completed=0.0/s active=423 sessions=32 fail_hs=0 fail_app=606 local_drop=0
+stats phase=run elapsed=20.0 offered=110.0/s attempted=110.0/s completed=71.0/s active=439 sessions=32 fail_hs=0 fail_app=629 local_drop=0
+stats phase=run elapsed=21.0 offered=110.0/s attempted=110.0/s completed=75.0/s active=334 sessions=32 fail_hs=0 fail_app=759 local_drop=0
+stats phase=run elapsed=22.0 offered=110.0/s attempted=110.0/s completed=1.0/s active=433 sessions=32 fail_hs=0 fail_app=759 local_drop=0
+stats phase=run elapsed=23.0 offered=110.0/s attempted=110.0/s completed=108.0/s active=383 sessions=32 fail_hs=0 fail_app=808 local_drop=0
+stats phase=run elapsed=24.0 offered=110.0/s attempted=110.0/s completed=0.0/s active=436 sessions=32 fail_hs=0 fail_app=808 local_drop=0
+stats phase=run elapsed=25.0 offered=110.0/s attempted=110.0/s completed=114.0/s active=409 sessions=32 fail_hs=0 fail_app=831 local_drop=0
+stats phase=run elapsed=26.0 offered=110.0/s attempted=110.0/s completed=32.0/s active=337 sessions=32 fail_hs=0 fail_app=959 local_drop=0
+stats phase=run elapsed=27.0 offered=110.0/s attempted=110.0/s completed=38.0/s active=407 sessions=32 fail_hs=0 fail_app=961 local_drop=0
+stats phase=run elapsed=28.0 offered=110.0/s attempted=110.0/s completed=71.0/s active=384 sessions=32 fail_hs=0 fail_app=1009 local_drop=0
+stats phase=run elapsed=29.0 offered=110.0/s attempted=110.0/s completed=0.0/s active=450 sessions=32 fail_hs=0 fail_app=1009 local_drop=0
+stats phase=run elapsed=30.0 offered=110.0/s attempted=110.0/s completed=146.0/s active=260 sessions=32 fail_hs=0 fail_app=1163 local_drop=0
+stats phase=run elapsed=31.0 offered=110.0/s attempted=110.0/s completed=0.0/s active=347 sessions=32 fail_hs=0 fail_app=1163 local_drop=0
+stats phase=run elapsed=32.0 offered=110.0/s attempted=110.0/s completed=79.0/s active=377 sessions=32 fail_hs=0 fail_app=1164 local_drop=0
+stats phase=run elapsed=33.0 offered=110.0/s attempted=110.0/s completed=30.0/s active=382 sessions=32 fail_hs=0 fail_app=1212 local_drop=0
+stats phase=run elapsed=34.0 offered=110.0/s attempted=110.0/s completed=0.0/s active=460 sessions=32 fail_hs=0 fail_app=1212 local_drop=0
+stats phase=run elapsed=35.0 offered=110.0/s attempted=110.0/s completed=146.0/s active=270 sessions=32 fail_hs=0 fail_app=1363 local_drop=0
+stats phase=run elapsed=36.0 offered=110.0/s attempted=110.0/s completed=0.0/s active=361 sessions=32 fail_hs=0 fail_app=1363 local_drop=0
+stats phase=run elapsed=37.0 offered=110.0/s attempted=110.0/s completed=109.0/s active=313 sessions=32 fail_hs=0 fail_app=1412 local_drop=0
+stats phase=run elapsed=38.0 offered=110.0/s attempted=110.0/s completed=0.0/s active=384 sessions=32 fail_hs=0 fail_app=1412 local_drop=0
+stats phase=run elapsed=39.0 offered=110.0/s attempted=110.0/s completed=0.0/s active=473 sessions=32 fail_hs=0 fail_app=1412 local_drop=0
+stats phase=run elapsed=40.0 offered=110.0/s attempted=110.0/s completed=146.0/s active=282 sessions=32 fail_hs=0 fail_app=1563 local_drop=0
+stats phase=run elapsed=41.0 offered=110.0/s attempted=110.0/s completed=0.0/s active=374 sessions=32 fail_hs=0 fail_app=1563 local_drop=0
+stats phase=run elapsed=42.0 offered=110.0/s attempted=110.0/s completed=109.0/s active=326 sessions=32 fail_hs=0 fail_app=1612 local_drop=0
+stats phase=run elapsed=43.0 offered=110.0/s attempted=110.0/s completed=0.0/s active=385 sessions=32 fail_hs=0 fail_app=1612 local_drop=0
+stats phase=run elapsed=44.0 offered=110.0/s attempted=110.0/s completed=4.0/s active=460 sessions=32 fail_hs=0 fail_app=1635 local_drop=0
+stats phase=run elapsed=45.0 offered=110.0/s attempted=110.0/s completed=125.0/s active=311 sessions=32 fail_hs=0 fail_app=1764 local_drop=0
+stats phase=run elapsed=46.0 offered=110.0/s attempted=110.0/s completed=0.0/s active=402 sessions=32 fail_hs=0 fail_app=1764 local_drop=0
+stats phase=run elapsed=47.0 offered=110.0/s attempted=110.0/s completed=126.0/s active=337 sessions=32 fail_hs=0 fail_app=1813 local_drop=0
+stats phase=run elapsed=48.0 offered=110.0/s attempted=110.0/s completed=0.0/s active=388 sessions=32 fail_hs=0 fail_app=1813 local_drop=0
+stats phase=run elapsed=49.0 offered=110.0/s attempted=110.0/s completed=1.0/s active=474 sessions=32 fail_hs=0 fail_app=1836 local_drop=0
+stats phase=run elapsed=50.0 offered=110.0/s attempted=110.0/s completed=137.0/s active=314 sessions=32 fail_hs=0 fail_app=1965 local_drop=0
+stats phase=run elapsed=51.0 offered=110.0/s attempted=110.0/s completed=0.0/s active=404 sessions=32 fail_hs=0 fail_app=1965 local_drop=0
+stats phase=run elapsed=52.0 offered=110.0/s attempted=110.0/s completed=117.0/s active=349 sessions=32 fail_hs=0 fail_app=2013 local_drop=0
+stats phase=run elapsed=53.0 offered=110.0/s attempted=110.0/s completed=0.0/s active=401 sessions=32 fail_hs=0 fail_app=2013 local_drop=0
+stats phase=run elapsed=54.0 offered=110.0/s attempted=110.0/s completed=10.0/s active=478 sessions=32 fail_hs=0 fail_app=2036 local_drop=0
+stats phase=run elapsed=55.0 offered=110.0/s attempted=110.0/s completed=120.0/s active=334 sessions=32 fail_hs=0 fail_app=2166 local_drop=0
+stats phase=run elapsed=56.0 offered=110.0/s attempted=110.0/s completed=0.0/s active=425 sessions=32 fail_hs=0 fail_app=2166 local_drop=0
+stats phase=run elapsed=57.0 offered=110.0/s attempted=110.0/s completed=125.0/s active=359 sessions=32 fail_hs=0 fail_app=2217 local_drop=0
+stats phase=run elapsed=58.0 offered=110.0/s attempted=110.0/s completed=0.0/s active=409 sessions=32 fail_hs=0 fail_app=2217 local_drop=0
+stats phase=run elapsed=59.0 offered=110.0/s attempted=110.0/s completed=22.0/s active=474 sessions=32 fail_hs=0 fail_app=2240 local_drop=0
+stats phase=run elapsed=60.0 offered=110.0/s attempted=110.0/s completed=109.0/s active=341 sessions=32 fail_hs=0 fail_app=2370 local_drop=0
+stats phase=run elapsed=61.0 offered=110.0/s attempted=110.0/s completed=9.0/s active=423 sessions=32 fail_hs=0 fail_app=2370 local_drop=0
+stats phase=run elapsed=62.0 offered=110.0/s attempted=110.0/s completed=115.0/s active=369 sessions=32 fail_hs=0 fail_app=2419 local_drop=0
+stats phase=run elapsed=63.0 offered=110.0/s attempted=110.0/s completed=0.0/s active=420 sessions=32 fail_hs=0 fail_app=2419 local_drop=0
+stats phase=run elapsed=64.0 offered=110.0/s attempted=110.0/s completed=64.0/s active=445 sessions=32 fail_hs=0 fail_app=2440 local_drop=0
+stats phase=run elapsed=65.0 offered=110.0/s attempted=110.0/s completed=84.0/s active=336 sessions=32 fail_hs=0 fail_app=2568 local_drop=0
+stats phase=run elapsed=66.0 offered=110.0/s attempted=110.0/s completed=0.0/s active=434 sessions=32 fail_hs=0 fail_app=2568 local_drop=0
+stats phase=run elapsed=67.0 offered=110.0/s attempted=110.0/s completed=108.0/s active=386 sessions=32 fail_hs=0 fail_app=2617 local_drop=0
+stats phase=run elapsed=68.0 offered=110.0/s attempted=110.0/s completed=0.0/s active=437 sessions=32 fail_hs=0 fail_app=2617 local_drop=0
+stats phase=run elapsed=69.0 offered=110.0/s attempted=110.0/s completed=109.0/s active=416 sessions=32 fail_hs=0 fail_app=2639 local_drop=0
+stats phase=run elapsed=70.0 offered=110.0/s attempted=110.0/s completed=38.0/s active=336 sessions=32 fail_hs=0 fail_app=2768 local_drop=0
+stats phase=run elapsed=71.0 offered=110.0/s attempted=110.0/s completed=32.0/s active=413 sessions=32 fail_hs=0 fail_app=2769 local_drop=0
+stats phase=run elapsed=72.0 offered=110.0/s attempted=110.0/s completed=76.0/s active=385 sessions=32 fail_hs=0 fail_app=2817 local_drop=0
+stats phase=run elapsed=73.0 offered=110.0/s attempted=110.0/s completed=0.0/s active=449 sessions=32 fail_hs=0 fail_app=2817 local_drop=0
+stats phase=run elapsed=74.0 offered=110.0/s attempted=110.0/s completed=147.0/s active=261 sessions=32 fail_hs=0 fail_app=2968 local_drop=0
+stats phase=run elapsed=75.0 offered=110.0/s attempted=110.0/s completed=0.0/s active=348 sessions=32 fail_hs=0 fail_app=2968 local_drop=0
+stats phase=run elapsed=76.0 offered=110.0/s attempted=110.0/s completed=80.0/s active=377 sessions=32 fail_hs=0 fail_app=2969 local_drop=0
+stats phase=run elapsed=77.0 offered=110.0/s attempted=110.0/s completed=28.0/s active=385 sessions=32 fail_hs=0 fail_app=3017 local_drop=0
+stats phase=run elapsed=78.0 offered=110.0/s attempted=110.0/s completed=0.0/s active=463 sessions=32 fail_hs=0 fail_app=3017 local_drop=0
+stats phase=run elapsed=79.0 offered=110.0/s attempted=110.0/s completed=147.0/s active=271 sessions=32 fail_hs=0 fail_app=3168 local_drop=0
+stats phase=run elapsed=80.0 offered=110.0/s attempted=110.0/s completed=0.0/s active=362 sessions=32 fail_hs=0 fail_app=3168 local_drop=0
+stats phase=run elapsed=81.0 offered=110.0/s attempted=110.0/s completed=108.0/s active=315 sessions=32 fail_hs=0 fail_app=3217 local_drop=0
+stats phase=run elapsed=82.0 offered=110.0/s attempted=110.0/s completed=0.0/s active=385 sessions=32 fail_hs=0 fail_app=3217 local_drop=0
+stats phase=run elapsed=83.0 offered=110.0/s attempted=110.0/s completed=0.0/s active=475 sessions=32 fail_hs=0 fail_app=3217 local_drop=0
+stats phase=run elapsed=84.0 offered=110.0/s attempted=110.0/s completed=147.0/s active=283 sessions=32 fail_hs=0 fail_app=3368 local_drop=0
+stats phase=run elapsed=85.0 offered=110.0/s attempted=110.0/s completed=0.0/s active=374 sessions=32 fail_hs=0 fail_app=3368 local_drop=0
+stats phase=run elapsed=86.0 offered=110.0/s attempted=110.0/s completed=108.0/s active=327 sessions=32 fail_hs=0 fail_app=3417 local_drop=0
+stats phase=run elapsed=87.0 offered=110.0/s attempted=110.0/s completed=0.0/s active=385 sessions=32 fail_hs=0 fail_app=3417 local_drop=0
+stats phase=run elapsed=88.0 offered=110.0/s attempted=110.0/s completed=10.0/s active=455 sessions=32 fail_hs=0 fail_app=3440 local_drop=0
+stats phase=run elapsed=89.0 offered=110.0/s attempted=110.0/s completed=137.0/s active=294 sessions=32 fail_hs=0 fail_app=3569 local_drop=0
+stats phase=run elapsed=90.0 offered=110.0/s attempted=110.0/s completed=0.0/s active=386 sessions=32 fail_hs=0 fail_app=3569 local_drop=0
+stats phase=run elapsed=91.0 offered=110.0/s attempted=110.0/s completed=108.0/s active=340 sessions=32 fail_hs=0 fail_app=3617 local_drop=0
+stats phase=run elapsed=92.0 offered=110.0/s attempted=110.0/s completed=0.0/s active=390 sessions=32 fail_hs=0 fail_app=3617 local_drop=0
+stats phase=run elapsed=93.0 offered=110.0/s attempted=110.0/s completed=19.0/s active=458 sessions=32 fail_hs=0 fail_app=3640 local_drop=0
+stats phase=run elapsed=94.0 offered=110.0/s attempted=110.0/s completed=128.0/s active=307 sessions=32 fail_hs=0 fail_app=3769 local_drop=0
+stats phase=run elapsed=95.0 offered=110.0/s attempted=110.0/s completed=0.0/s active=399 sessions=32 fail_hs=0 fail_app=3769 local_drop=0
+stats phase=run elapsed=96.0 offered=110.0/s attempted=110.0/s completed=108.0/s active=351 sessions=32 fail_hs=0 fail_app=3819 local_drop=0
+stats phase=run elapsed=97.0 offered=110.0/s attempted=110.0/s completed=0.0/s active=402 sessions=32 fail_hs=0 fail_app=3819 local_drop=0
+stats phase=run elapsed=98.0 offered=110.0/s attempted=110.0/s completed=17.0/s active=472 sessions=32 fail_hs=0 fail_app=3842 local_drop=0
+stats phase=run elapsed=99.0 offered=110.0/s attempted=110.0/s completed=130.0/s active=319 sessions=32 fail_hs=0 fail_app=3971 local_drop=0
+stats phase=run elapsed=100.0 offered=110.0/s attempted=110.0/s completed=0.0/s active=410 sessions=32 fail_hs=0 fail_app=3971 local_drop=0
+stats phase=run elapsed=101.0 offered=110.0/s attempted=110.0/s completed=108.0/s active=362 sessions=32 fail_hs=0 fail_app=4021 local_drop=0
+stats phase=run elapsed=102.0 offered=110.0/s attempted=110.0/s completed=0.0/s active=413 sessions=32 fail_hs=0 fail_app=4021 local_drop=0
+stats phase=run elapsed=103.0 offered=110.0/s attempted=110.0/s completed=30.0/s active=470 sessions=32 fail_hs=0 fail_app=4044 local_drop=0
+stats phase=run elapsed=104.0 offered=110.0/s attempted=110.0/s completed=116.0/s active=330 sessions=32 fail_hs=0 fail_app=4174 local_drop=0
+stats phase=run elapsed=105.0 offered=110.0/s attempted=110.0/s completed=0.0/s active=422 sessions=32 fail_hs=0 fail_app=4174 local_drop=0
+stats phase=run elapsed=106.0 offered=110.0/s attempted=110.0/s completed=109.0/s active=374 sessions=32 fail_hs=0 fail_app=4223 local_drop=0
+stats phase=run elapsed=107.0 offered=110.0/s attempted=110.0/s completed=0.0/s active=424 sessions=32 fail_hs=0 fail_app=4223 local_drop=0
+stats phase=run elapsed=108.0 offered=110.0/s attempted=110.0/s completed=71.0/s active=440 sessions=32 fail_hs=0 fail_app=4246 local_drop=0
+stats phase=run elapsed=109.0 offered=110.0/s attempted=110.0/s completed=75.0/s active=333 sessions=32 fail_hs=0 fail_app=4375 local_drop=0
+stats phase=run elapsed=110.0 offered=110.0/s attempted=110.0/s completed=1.0/s active=431 sessions=32 fail_hs=0 fail_app=4376 local_drop=0
+stats phase=run elapsed=111.0 offered=110.0/s attempted=110.0/s completed=108.0/s active=383 sessions=32 fail_hs=0 fail_app=4424 local_drop=0
+stats phase=run elapsed=112.0 offered=110.0/s attempted=110.0/s completed=0.0/s active=437 sessions=32 fail_hs=0 fail_app=4424 local_drop=0
+stats phase=run elapsed=113.0 offered=110.0/s attempted=110.0/s completed=118.0/s active=406 sessions=32 fail_hs=0 fail_app=4447 local_drop=0
+stats phase=run elapsed=114.0 offered=110.0/s attempted=110.0/s completed=28.0/s active=337 sessions=32 fail_hs=0 fail_app=4576 local_drop=0
+stats phase=run elapsed=115.0 offered=110.0/s attempted=110.0/s completed=42.0/s active=404 sessions=32 fail_hs=0 fail_app=4577 local_drop=0
+stats phase=run elapsed=116.0 offered=110.0/s attempted=110.0/s completed=67.0/s active=384 sessions=32 fail_hs=0 fail_app=4625 local_drop=0
+stats phase=run elapsed=117.0 offered=110.0/s attempted=110.0/s completed=0.0/s active=451 sessions=32 fail_hs=0 fail_app=4625 local_drop=0
+stats phase=run elapsed=118.0 offered=110.0/s attempted=110.0/s completed=146.0/s active=262 sessions=32 fail_hs=0 fail_app=4777 local_drop=0
+stats phase=run elapsed=119.0 offered=110.0/s attempted=110.0/s completed=0.0/s active=351 sessions=32 fail_hs=0 fail_app=4777 local_drop=0
+stats phase=drain elapsed=120.0 offered=109.6/s attempted=109.6/s completed=88.6/s active=370 sessions=32 fail_hs=0 fail_app=4779 local_drop=0
+stats phase=drain elapsed=121.0 offered=0.0/s attempted=0.0/s completed=20.0/s active=279 sessions=32 fail_hs=0 fail_app=4821 local_drop=0
+stats phase=drain elapsed=122.0 offered=0.0/s attempted=0.0/s completed=0.0/s active=249 sessions=32 fail_hs=0 fail_app=4821 local_drop=0
+stats phase=drain elapsed=123.0 offered=0.0/s attempted=0.0/s completed=129.0/s active=120 sessions=32 fail_hs=0 fail_app=4821 local_drop=0
+stats phase=drain elapsed=124.0 offered=0.0/s attempted=0.0/s completed=0.0/s active=120 sessions=32 fail_hs=0 fail_app=4821 local_drop=0
+stats phase=done elapsed=124.8 offered=0.0/s attempted=0.0/s completed=151.1/s active=0 sessions=32 fail_hs=0 fail_app=4821 local_drop=0
+run_end offered=13201 attempted=13201 completed=6516 local_drop=0 session_unavailable=0

@@ -1,0 +1,43 @@
+# One matrix represents one scenario-specific campaign. The same
+# overall_campaign_id groups the separate A, B, C, D and E campaigns.
+[campaign]
+campaign_id = "CHANGE_ME_A_BENIGN_PILOT_01"
+overall_campaign_id = "CHANGE_ME_BENIGN_PILOT_01"
+campaign_type = "pilot" # pilot or repeated
+description = "Scenario A benign rate calibration"
+
+[[runs]]
+scenario = "A"
+profile = "measurement"
+reference_workload = "full-handshake"
+generator_backend = "fstack"
+generator_workload = "full-handshake"
+generator_mode = "benign"
+rates = [10.0, 20.0, 40.0]
+max_inflight = 512
+record_connections = 32
+repetitions = 1
+
+[[runs]]
+scenario = "A"
+profile = "measurement"
+reference_workload = "resumption"
+generator_backend = "fstack"
+generator_workload = "resumption"
+generator_mode = "benign"
+rates = [10.0, 20.0, 40.0]
+max_inflight = 512
+record_connections = 32
+repetitions = 1
+
+[[runs]]
+scenario = "A"
+profile = "measurement"
+reference_workload = "record"
+generator_backend = "fstack"
+generator_workload = "record"
+generator_mode = "benign"
+rates = [100.0, 500.0, 1000.0]
+max_inflight = 512
+record_connections = 32
+repetitions = 1

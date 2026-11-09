@@ -1,0 +1,46 @@
+EAL: Detected CPU lcores: 12
+EAL: Detected NUMA nodes: 1
+EAL: Detected static linkage of DPDK
+EAL: Multi-process socket /var/run/dpdk/container-tls_loadgen/mp_socket
+EAL: Selected IOVA mode 'VA'
+EAL: VFIO support initialized
+EAL: Using IOMMU type 1 (Type 1)
+EAL: Ignore mapping IO port bar(2)
+EAL: Probe PCI driver: net_e1000_em (8086:10d3) device: 0000:01:00.0 (socket -1)
+TELEMETRY: No legacy callbacks, legacy socket not created
+lcore: 2, port: 0, queue: 0
+create mbuf pool on socket 0
+create ring:dispatch_ring_p0_q0 success, 2047 ring entries are now free!
+Port 0 MAC:68:05:CA:61:94:30
+RX checksum offload supported
+TX ip checksum offload supported
+TX TCP&UDP checksum offload supported
+TSO is disabled
+set port 0 to promiscuous mode ok
+
+Checking link status..............................done
+Port 0 Link Up - speed 1000 Mbps - full-duplex
+link_elf_lookup_symbol: missing symbol hash table
+link_elf_lookup_symbol: missing symbol hash table
+Timecounters tick every 10.000 msec
+WARNING: Adding ifaddrs to all fibs has been turned off by default. Consider tuning net.add_addr_allfibs if needed
+Attempting to load tcp_bbr
+tcp_bbr is now available
+TCP Hpts created 1 swi interrupt threads and bound 0 to cpus
+Timecounter "ff_clock" frequency 100 Hz quality 1
+TCP_ratelimit: Is now initialized
+f-stack-0: No addr6 config found.
+f-stack-0: Ethernet address: 68:05:ca:61:94:30
+f-stack-0: Successed to register dpdk interface
+Limiting closed port RST response from 216 to 200 packets/sec
+Limiting closed port RST response from 218 to 200 packets/sec
+Limiting closed port RST response from 227 to 200 packets/sec
+Limiting closed port RST response from 254 to 200 packets/sec
+Limiting closed port RST response from 255 to 200 packets/sec
+Limiting closed port RST response from 253 to 200 packets/sec
+Limiting closed port RST response from 253 to 200 packets/sec
+Limiting closed port RST response from 254 to 200 packets/sec
+Limiting closed port RST response from 255 to 200 packets/sec
+Limiting closed port RST response from 254 to 200 packets/sec
+Limiting closed port RST response from 254 to 200 packets/sec
+Limiting closed port RST response from 230 to 200 packets/sec

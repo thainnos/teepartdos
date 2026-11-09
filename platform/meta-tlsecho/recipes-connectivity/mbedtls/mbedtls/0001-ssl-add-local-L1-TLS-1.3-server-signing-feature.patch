@@ -1,0 +1,65 @@
+From c0b0123588726329ec4a76f78954eb17d3b5bf6a Mon Sep 17 00:00:00 2001
+From: Florian Foerster <florian.foerster@tha.de>
+Date: Tue, 30 Jun 2026 16:17:36 +0000
+Subject: [PATCH] ssl: add local L1 TLS 1.3 server signing feature
+
+Add an internal build marker and configuration guard for the local
+synchronous TLS 1.3 server CertificateVerify extension.
+
+Upstream-Status: Inappropriate [local experimental research extension]
+---
+ include/mbedtls/check_config.h   |  8 ++++++++
+ include/mbedtls/mbedtls_config.h | 21 +++++++++++++++++++++
+ 2 files changed, 29 insertions(+)
+
+diff --git a/include/mbedtls/check_config.h b/include/mbedtls/check_config.h
+index 67a05f83b8..c56fc8d6b1 100644
+--- a/include/mbedtls/check_config.h
++++ b/include/mbedtls/check_config.h
+@@ -876,6 +876,14 @@
+ #error "MBEDTLS_SSL_ASYNC_PRIVATE defined, but not all prerequisites"
+ #endif
+ 
++#if defined(MBEDTLS_SSL_TLS1_3_SERVER_EXTERNAL_SIGNING) && \
++    (!defined(MBEDTLS_SSL_ASYNC_PRIVATE) || \
++     !defined(MBEDTLS_SSL_PROTO_TLS1_3) || \
++     !defined(MBEDTLS_SSL_SRV_C) || \
++     !defined(MBEDTLS_X509_CRT_PARSE_C))
++#error "MBEDTLS_SSL_TLS1_3_SERVER_EXTERNAL_SIGNING defined, but not all prerequisites"
++#endif
++
+ #if defined(MBEDTLS_SSL_TLS_C) && !(defined(MBEDTLS_CIPHER_C) || \
+     defined(MBEDTLS_USE_PSA_CRYPTO))
+ #error "MBEDTLS_SSL_TLS_C defined, but not all prerequisites"
+diff --git a/include/mbedtls/mbedtls_config.h b/include/mbedtls/mbedtls_config.h
+index 0a0bf25ff0..0c85c53e2b 100644
+--- a/include/mbedtls/mbedtls_config.h
++++ b/include/mbedtls/mbedtls_config.h
+@@ -1622,6 +1622,27 @@
+  */
+ #define MBEDTLS_SSL_ASYNC_PRIVATE
+ 
++/**
++ * \def MBEDTLS_SSL_TLS1_3_SERVER_EXTERNAL_SIGNING
++ *
++ * Local experimental extension for the TrustZone TLS study.
++ *
++ * Enable synchronous TLS 1.3 server CertificateVerify signing through the
++ * existing MBEDTLS_SSL_ASYNC_PRIVATE callback interface. Deferred completion
++ * is intentionally not supported by this extension.
++ *
++ * Requires: MBEDTLS_SSL_ASYNC_PRIVATE
++ * Requires: MBEDTLS_SSL_PROTO_TLS1_3
++ * Requires: MBEDTLS_SSL_SRV_C
++ * Requires: MBEDTLS_X509_CRT_PARSE_C
++ */
++#define MBEDTLS_SSL_TLS1_3_SERVER_EXTERNAL_SIGNING
++
++/*
++ * Local patch-set revision. This is not an upstream Mbed TLS version number.
++ */
++#define MBEDTLS_SSL_L1_PATCH_VERSION 1
++
+ /**
+  * \def MBEDTLS_SSL_CONTEXT_SERIALIZATION
+  *

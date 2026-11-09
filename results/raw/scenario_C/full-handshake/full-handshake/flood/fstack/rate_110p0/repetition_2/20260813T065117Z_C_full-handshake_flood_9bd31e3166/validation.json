@@ -1,0 +1,8 @@
+{
+  "errors": [],
+  "status": "PASS",
+  "validated_utc": "2026-08-13T06:56:39.968449405Z",
+  "warnings": [
+    "DUT accepted=8226 is below generator tcp_established_total=11747"
+  ]
+}

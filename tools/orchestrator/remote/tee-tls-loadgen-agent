@@ -1,0 +1,421 @@
+#!/bin/bash
+set -euo pipefail
+
+# Keep remote execution independent of the interactive account locale and PATH.
+export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+export LANG=C
+export LC_ALL=C
+
+CONFIG=${TEE_TLS_LOADGEN_AGENT_CONFIG:-/etc/tee-tls-orchestrator/loadgen-agent.conf}
+[[ -r "$CONFIG" ]] || { echo "ERROR=missing_agent_config:$CONFIG" >&2; exit 2; }
+# shellcheck disable=SC1090
+source "$CONFIG"
+
+# The Ubuntu account's primary group is not required to have the same name as
+# the account. Resolve it on the host instead of baking that assumption into
+# the generated configuration.
+if [[ ${RUN_GROUP:-auto} == auto || -z ${RUN_GROUP:-} ]]; then
+    RUN_GROUP=$(id -gn "$RUN_OWNER" 2>/dev/null) || {
+        echo "ERROR=invalid_run_owner:$RUN_OWNER" >&2
+        exit 2
+    }
+fi
+
+export LD_LIBRARY_PATH="$OPENSSL_LIB${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+[[ -d $OPENSSL_MODULES ]] && export OPENSSL_MODULES
+
+require_root() { [[ $(id -u) -eq 0 ]] || { echo "ERROR=root_required" >&2; exit 2; }; }
+safe_id() { [[ $1 =~ ^[A-Za-z0-9._-]{1,128}$ ]] || { echo "ERROR=invalid_identifier" >&2; exit 2; }; }
+safe_scenario() { [[ $1 =~ ^[A-E]$ ]] || { echo "ERROR=invalid_scenario" >&2; exit 2; }; }
+safe_workload() { [[ $1 == full-handshake || $1 == resumption || $1 == record || $1 == tcp-syn ]] || { echo "ERROR=invalid_workload" >&2; exit 2; }; }
+safe_mode() { [[ $1 == benign || $1 == flood ]] || { echo "ERROR=invalid_mode" >&2; exit 2; }; }
+safe_backend() { [[ $1 == posix || $1 == fstack ]] || { echo "ERROR=invalid_backend" >&2; exit 2; }; }
+is_uint() { [[ $1 =~ ^[0-9]+$ ]]; }
+is_rate() { [[ $1 =~ ^[0-9]+([.][0-9]+)?$ ]] && awk -v v="$1" 'BEGIN{exit !(v>0)}'; }
+is_zero_rate() { [[ $1 =~ ^[0-9]+([.][0-9]+)?$ ]] && awk -v v="$1" 'BEGIN{exit !(v==0)}'; }
+require_cmd() { command -v "$1" >/dev/null 2>&1 || { echo "FAIL=missing_command:$1"; return 1; }; }
+config_value() {
+    local key=$1 file=$2
+    awk -v wanted="$key" '
+        function trim(value) {
+            sub(/^[[:space:]]+/, "", value)
+            sub(/[[:space:]]+$/, "", value)
+            return value
+        }
+        /^[[:space:]]*#/ || /^[[:space:]]*$/ { next }
+        {
+            line=$0
+            eq=index(line, "=")
+            if (eq == 0) next
+            parsed_key=trim(substr(line, 1, eq - 1))
+            if (parsed_key != wanted) next
+            parsed_value=trim(substr(line, eq + 1))
+            sub(/[[:space:]]*#.*/, "", parsed_value)
+            result=trim(parsed_value)
+            found=1
+        }
+        END { if (!found) exit 1; print result }
+    ' "$file"
+}
+expect_config() {
+    local key=$1 expected=$2 actual
+    actual=$(config_value "$key" "$GENERATOR_CONFIG" 2>/dev/null || true)
+    [[ $actual == "$expected" ]] || { echo "FAIL=generator_config:$key:$actual:expected:$expected"; return 1; }
+}
+json_escape() { python3 -c 'import json,sys; print(json.dumps(sys.argv[1]))' "$1"; }
+now_ns() {
+    local value
+    value=$(date +%s%N 2>/dev/null) || { echo "ERROR=clock_command_failed" >&2; exit 4; }
+    [[ $value =~ ^[0-9]+$ ]] || { echo "ERROR=nanosecond_clock_unsupported:$value" >&2; exit 4; }
+    printf '%s\n' "$value"
+}
+clock_probe() {
+    local probe_id
+    printf 'READY\n'
+    while IFS= read -r probe_id; do
+        [[ $probe_id =~ ^[0-9]+$ ]] || { echo "ERROR=invalid_clock_probe_id" >&2; exit 2; }
+        printf '%s %s\n' "$probe_id" "$(now_ns)"
+    done
+}
+
+binary_for() { [[ $1 == posix ]] && printf '%s\n' "$POSIX_BINARY" || printf '%s\n' "$FSTACK_BINARY"; }
+
+terminal_process_state() {
+    local status_file=$1
+    [[ -s $status_file ]] || return 1
+    python3 - "$status_file" <<'PY_STATUS'
+import json, sys
+try:
+    state = json.load(open(sys.argv[1], encoding="utf-8")).get("state")
+except (OSError, ValueError, TypeError):
+    raise SystemExit(1)
+if state in {"finished", "failed_before_start", "cancelled_before_start"}:
+    print(state)
+    raise SystemExit(0)
+raise SystemExit(1)
+PY_STATUS
+}
+
+archive_run() {
+    local run_id=${1:-}
+    safe_id "$run_id"
+    local run_dir="$RUN_ROOT/$run_id"
+    [[ -d $run_dir ]] || { echo "ERROR=missing_run_directory:$run_dir" >&2; exit 3; }
+    command -v tar >/dev/null 2>&1 || { echo "ERROR=tar_missing" >&2; exit 4; }
+    exec tar -C "$run_dir" -cf - .
+}
+
+check_tar_support() {
+    local test_dir="$RUN_ROOT/.tar-preflight.$$"
+    rm -rf "$test_dir"
+    mkdir -p "$test_dir"
+    printf 'ok\n' >"$test_dir/probe"
+    tar -C "$test_dir" -cf /dev/null . >/dev/null 2>&1
+    local rc=$?
+    rm -rf "$test_dir"
+    return "$rc"
+}
+
+check_generator_config() {
+    local failures=0
+    expect_config target.address "$DUT_ADDRESS" || ((failures+=1))
+    expect_config target.port "$TLS_PORT" || ((failures+=1))
+    expect_config target.mac "$DUT_MAC" || ((failures+=1))
+    expect_config network.source_address "$DATA_ADDRESS" || ((failures+=1))
+    expect_config network.interface "$DATA_INTERFACE" || ((failures+=1))
+    expect_config network.mtu "$MTU" || ((failures+=1))
+    expect_config network.netmask "$EXPECTED_NETWORK_NETMASK" || ((failures+=1))
+    expect_config network.tcp_nodelay "$EXPECTED_TCP_NODELAY" || ((failures+=1))
+    expect_config tls.ca_file "$CA_FILE" || ((failures+=1))
+    expect_config tls.server_name "$SERVER_NAME" || ((failures+=1))
+    expect_config tls.verify_peer true || ((failures+=1))
+    expect_config tls.verify_hostname false || ((failures+=1))
+    expect_config tls.ciphersuite "$TLS_CIPHERSUITE" || ((failures+=1))
+    expect_config tls.group "$TLS_GROUP" || ((failures+=1))
+    expect_config tls.signature_algorithm "$TLS_SIGNATURE_ALGORITHM" || ((failures+=1))
+    expect_config payload.size "$PAYLOAD_SIZE" || ((failures+=1))
+    expect_config run.max_release_burst "$EXPECTED_MAX_RELEASE_BURST" || ((failures+=1))
+    expect_config run.drain_timeout_ms "$EXPECTED_DRAIN_TIMEOUT_MS" || ((failures+=1))
+    expect_config timeout.tcp_connect_ms "$EXPECTED_TCP_CONNECT_TIMEOUT_MS" || ((failures+=1))
+    expect_config timeout.tls_handshake_ms "$EXPECTED_TLS_HANDSHAKE_TIMEOUT_MS" || ((failures+=1))
+    expect_config timeout.io_ms "$EXPECTED_IO_TIMEOUT_MS" || ((failures+=1))
+    expect_config payload.pattern_hex "$EXPECTED_PAYLOAD_PATTERN_HEX" || ((failures+=1))
+    expect_config full.echo_after_handshake "$EXPECTED_FULL_ECHO_AFTER_HANDSHAKE" || ((failures+=1))
+    expect_config resumption.session_policy "$EXPECTED_RESUMPTION_POLICY" || ((failures+=1))
+    expect_config resumption.pool_size "$EXPECTED_RESUMPTION_POOL_SIZE" || ((failures+=1))
+    expect_config resumption.wait_for_fresh_ticket "$EXPECTED_WAIT_FOR_FRESH_TICKET" || ((failures+=1))
+    expect_config record.max_pending_releases "$EXPECTED_RECORD_MAX_PENDING_RELEASES" || ((failures+=1))
+    expect_config record.reconnect "$EXPECTED_RECORD_RECONNECT" || ((failures+=1))
+    expect_config record.reconnect_backoff_ms "$EXPECTED_RECORD_RECONNECT_BACKOFF_MS" || ((failures+=1))
+    expect_config output.stdout_progress "$EXPECTED_STDOUT_PROGRESS" || ((failures+=1))
+    expect_config fstack.proc_id "$EXPECTED_FSTACK_PROC_ID" || ((failures+=1))
+    return "$failures"
+}
+
+preflight() {
+    require_root
+    backend=${1:-}; safe_backend "$backend"
+    failures=0
+    for command_name in id date ip readlink basename awk python3 nohup tar rm mkdir install chown kill grep tail sleep cat; do
+        require_cmd "$command_name" || ((failures+=1))
+    done
+    if [[ $failures -ne 0 ]]; then echo "FAILURES=$failures"; return 1; fi
+    id "$RUN_OWNER" >/dev/null 2>&1 || { echo "FAIL=run_owner:$RUN_OWNER"; ((failures+=1)); }
+    [[ $(id -gn "$RUN_OWNER" 2>/dev/null || true) == "$RUN_GROUP" ]] || { echo "FAIL=run_group:$RUN_GROUP"; ((failures+=1)); }
+    install -d -m 0755 -o "$RUN_OWNER" -g "$RUN_GROUP" "$RUN_ROOT" || { echo "FAIL=run_root_unusable:$RUN_ROOT"; ((failures+=1)); }
+    [[ -d $PROJECT_ROOT && -x $PROJECT_ROOT ]] || { echo "FAIL=project_root_unusable:$PROJECT_ROOT"; ((failures+=1)); }
+    now_ns >/dev/null 2>&1 || { echo "FAIL=nanosecond_clock"; ((failures+=1)); }
+    sleep 0.01 >/dev/null 2>&1 || { echo "FAIL=fractional_sleep_support"; ((failures+=1)); }
+    check_tar_support || { echo "FAIL=tar_stream_support"; ((failures+=1)); }
+    binary=$(binary_for "$backend")
+    [[ -x $binary ]] || { echo "FAIL=missing_binary:$binary"; ((failures+=1)); }
+    [[ -r $GENERATOR_CONFIG ]] || { echo "FAIL=missing_generator_config"; ((failures+=1)); }
+    [[ -r $CA_FILE ]] || { echo "FAIL=missing_ca"; ((failures+=1)); }
+    [[ -d $OPENSSL_LIB ]] || { echo "FAIL=missing_openssl_lib_dir:$OPENSSL_LIB"; ((failures+=1)); }
+    [[ -d $OPENSSL_MODULES ]] || { echo "FAIL=missing_openssl_modules_dir:$OPENSSL_MODULES"; ((failures+=1)); }
+    [[ -x $SCHEDULED_EXEC ]] || { echo "FAIL=missing_scheduled_exec"; ((failures+=1)); }
+    if [[ -x $binary ]]; then
+        version=$($binary --version 2>&1) || { echo "FAIL=generator_version_command:$binary"; ((failures+=1)); version=; }
+        grep -Eq "^tls_loadgen ${EXPECTED_GENERATOR_VERSION}([[:space:]]|$)" <<<"$version" || { echo "FAIL=generator_version:$version:expected:$EXPECTED_GENERATOR_VERSION"; ((failures+=1)); }
+        grep -Eq '^tls_loadgen [^[:space:]]+ git=[0-9a-f]{12}$' <<<"$version" || { echo "FAIL=generator_git_identity:$version"; ((failures+=1)); }
+        help=$($binary --help 2>&1) || { echo "FAIL=generator_help:$binary"; ((failures+=1)); help=; }
+        for option in --config --backend --scenario --workload --mode --rate --duration --max-inflight --record-connections --target --port --output-dir --run-id --fstack-conf; do
+            grep -q -- "$option" <<<"$help" || { echo "FAIL=generator_option:$option"; ((failures+=1)); }
+        done
+    fi
+    if [[ -r $GENERATOR_CONFIG ]]; then
+        check_generator_config || failures=$((failures + $?))
+    fi
+    driver=$(basename "$(readlink -f "/sys/bus/pci/devices/$PCI_ADDRESS/driver" 2>/dev/null || true)")
+    if [[ $backend == posix ]]; then
+        [[ $driver == "$KERNEL_DRIVER" ]] || { echo "FAIL=kernel_driver:$driver"; ((failures+=1)); }
+        ip -o -4 addr show dev "$DATA_INTERFACE" | grep -q " $DATA_ADDRESS/" || { echo "FAIL=data_address"; ((failures+=1)); }
+        ip link show dev "$DATA_INTERFACE" | grep -q "mtu $MTU" || { echo "FAIL=data_mtu"; ((failures+=1)); }
+        route=$(ip route get "$DUT_ADDRESS" 2>/dev/null || true)
+        grep -q "dev $DATA_INTERFACE" <<<"$route" && grep -q "src $DATA_ADDRESS" <<<"$route" || { echo "FAIL=data_route:$route"; ((failures+=1)); }
+    else
+        [[ $driver == vfio-pci ]] || { echo "FAIL=vfio_driver:$driver"; ((failures+=1)); }
+        [[ -r $FSTACK_CONFIG ]] || { echo "FAIL=missing_fstack_config"; ((failures+=1)); }
+        if [[ -r $FSTACK_CONFIG ]]; then
+            grep -Eq "^[[:space:]]*allow[[:space:]]*=[[:space:]]*$PCI_ADDRESS[[:space:]]*$" "$FSTACK_CONFIG" || { echo "FAIL=fstack_pci"; ((failures+=1)); }
+            grep -Eq "^[[:space:]]*addr[[:space:]]*=[[:space:]]*$DATA_ADDRESS[[:space:]]*$" "$FSTACK_CONFIG" || { echo "FAIL=fstack_address"; ((failures+=1)); }
+            grep -Eq "^[[:space:]]*netmask[[:space:]]*=[[:space:]]*255\.255\.255\.0[[:space:]]*$" "$FSTACK_CONFIG" || { echo "FAIL=fstack_netmask"; ((failures+=1)); }
+        fi
+        huge_free=$(awk '/HugePages_Free:/ {print $2}' /proc/meminfo)
+        [[ ${huge_free:-0} -gt 0 ]] || { echo "FAIL=no_free_hugepages"; ((failures+=1)); }
+    fi
+    ip -o -4 addr show dev "$CONTROL_INTERFACE" | grep -q " $CONTROL_ADDRESS/" || { echo "FAIL=control_address"; ((failures+=1)); }
+    if command -v setsid >/dev/null 2>&1; then detach_method=setsid; else detach_method=nohup; fi
+    echo "BACKEND=$backend"
+    echo "PCI_DRIVER=${driver:-none}"
+    echo "DETACH_METHOD=$detach_method"
+    echo "ARCHIVE_METHOD=tar-stream"
+    echo "FAILURES=$failures"
+    [[ $failures -eq 0 ]]
+}
+
+iperf_preflight() {
+    require_root
+    failures=0
+    for command_name in id ip tar readlink basename install chown cat grep python3; do require_cmd "$command_name" || ((failures+=1)); done
+    if [[ $failures -ne 0 ]]; then echo "FAILURES=$failures"; return 1; fi
+    driver=$(basename "$(readlink -f "/sys/bus/pci/devices/$PCI_ADDRESS/driver" 2>/dev/null || true)")
+    [[ $driver == "$KERNEL_DRIVER" ]] || { echo "FAIL=kernel_driver:$driver"; ((failures+=1)); }
+    ip -o -4 addr show dev "$DATA_INTERFACE" | grep -q " $DATA_ADDRESS/" || { echo "FAIL=data_address"; ((failures+=1)); }
+    ip link show dev "$DATA_INTERFACE" | grep -q "mtu $MTU" || { echo "FAIL=data_mtu"; ((failures+=1)); }
+    route=$(ip route get "$DUT_ADDRESS" 2>/dev/null || true)
+    grep -q "dev $DATA_INTERFACE" <<<"$route" && grep -q "src $DATA_ADDRESS" <<<"$route" || { echo "FAIL=data_route:$route"; ((failures+=1)); }
+    ip -o -4 addr show dev "$CONTROL_INTERFACE" | grep -q " $CONTROL_ADDRESS/" || { echo "FAIL=control_address"; ((failures+=1)); }
+    [[ -x $IPERF3 ]] || command -v "$IPERF3" >/dev/null 2>&1 || { echo "FAIL=iperf3_missing"; ((failures+=1)); }
+    if [[ -x $IPERF3 ]] || command -v "$IPERF3" >/dev/null 2>&1; then iperf_cli_check || ((failures+=1)); fi
+    echo "FAILURES=$failures"
+    [[ $failures -eq 0 ]]
+}
+
+
+iperf_cli_check() {
+    local help option
+    help=$("$IPERF3" --help 2>&1) || { echo "FAIL=iperf3_help"; return 1; }
+    for option in --client --port --time --parallel --json --reverse --udp --bitrate; do
+        grep -q -- "$option" <<<"$help" || { echo "FAIL=iperf3_option:$option"; return 1; }
+    done
+    return 0
+}
+
+run_start() {
+    require_root
+    [[ $# -eq 10 ]] || { echo "ERROR=run_argument_count" >&2; exit 2; }
+    run_id=$1 scenario=$2 workload=$3 mode=$4 backend=$5 rate=$6 duration=$7 max_inflight=$8 record_connections=$9 scheduled_start_ns=${10}
+    safe_id "$run_id"; safe_scenario "$scenario"; safe_workload "$workload"; safe_mode "$mode"; safe_backend "$backend"
+    if [[ $workload == tcp-syn ]]; then
+        [[ $mode == flood ]] || { echo "ERROR=tcp_syn_requires_flood_mode" >&2; exit 2; }
+        [[ $backend == posix ]] || { echo "ERROR=tcp_syn_requires_posix_backend" >&2; exit 2; }
+        is_zero_rate "$rate" || { echo "ERROR=tcp_syn_rate_must_be_zero" >&2; exit 2; }
+    else
+        is_rate "$rate" || { echo "ERROR=invalid_rate" >&2; exit 2; }
+    fi
+    is_uint "$duration" && [[ $duration -gt 0 ]] || { echo "ERROR=invalid_duration" >&2; exit 2; }
+    is_uint "$max_inflight" && [[ $max_inflight -gt 0 ]] || { echo "ERROR=invalid_max_inflight" >&2; exit 2; }
+    is_uint "$record_connections" && [[ $record_connections -gt 0 ]] || { echo "ERROR=invalid_record_connections" >&2; exit 2; }
+    is_uint "$scheduled_start_ns" || { echo "ERROR=invalid_start" >&2; exit 2; }
+    preflight "$backend" >/dev/null
+
+    run_dir="$RUN_ROOT/$run_id"
+    [[ ! -e $run_dir ]] || { echo "ERROR=run_directory_exists" >&2; exit 3; }
+    install -d -m 0755 -o "$RUN_OWNER" -g "$RUN_GROUP" "$run_dir" "$run_dir/output"
+    if [[ $workload == tcp-syn ]]; then
+        external_runner="$PROJECT_ROOT/scripts/external_tool_runner.py"
+        external_config="$PROJECT_ROOT/config/external_tool.toml"
+        [[ -x $external_runner ]] || { echo "ERROR=missing_external_tool_runner:$external_runner" >&2; exit 2; }
+        [[ -f $external_config ]] || { echo "ERROR=missing_external_tool_config:$external_config" >&2; exit 2; }
+        cmd=("$external_runner" --config "$external_config"
+            --run-id "$run_id" --scenario "$scenario" --duration "$duration" --rate "$rate"
+            --max-inflight "$max_inflight" --record-connections "$record_connections"
+            --generator-config "$GENERATOR_CONFIG" --output-dir "$run_dir/output")
+    else
+        binary=$(binary_for "$backend")
+        cmd=("$binary" --config "$GENERATOR_CONFIG" --backend "$backend" --scenario "$scenario" --workload "$workload" --mode "$mode" --rate "$rate" --duration "$duration" --max-inflight "$max_inflight" --record-connections "$record_connections" --target "$DUT_ADDRESS" --port "$TLS_PORT" --output-dir "$run_dir/output" --run-id "$run_id")
+        [[ $backend == fstack ]] && cmd+=(--fstack-conf "$FSTACK_CONFIG")
+    fi
+    printf '%q ' "${cmd[@]}" >"$run_dir/generator.command.sh"; printf '\n' >>"$run_dir/generator.command.sh"
+    chown "$RUN_OWNER:$RUN_GROUP" "$run_dir/generator.command.sh"
+
+    wrapper_cmd=("$SCHEDULED_EXEC"
+        --scheduled-start-ns "$scheduled_start_ns"
+        --status "$run_dir/process_status.json"
+        --stdout "$run_dir/generator.stdout.log"
+        --stderr "$run_dir/generator.stderr.log"
+        --pid-file "$run_dir/generator.pid"
+        --workdir "$PROJECT_ROOT"
+        --chown "$RUN_OWNER:$RUN_GROUP" --chown-tree "$run_dir"
+        -- "${cmd[@]}")
+    # Create the detached wrapper logs before launching the background shell.
+    # Otherwise the foreground chown can race with shell redirection and fail
+    # intermittently because one or both log files do not exist yet.
+    : >"$run_dir/wrapper.stdout.log"
+    : >"$run_dir/wrapper.stderr.log"
+    chown "$RUN_OWNER:$RUN_GROUP" "$run_dir/wrapper.stdout.log" "$run_dir/wrapper.stderr.log"
+    if command -v setsid >/dev/null 2>&1; then
+        nohup setsid "${wrapper_cmd[@]}" </dev/null >"$run_dir/wrapper.stdout.log" 2>"$run_dir/wrapper.stderr.log" &
+    else
+        nohup "${wrapper_cmd[@]}" </dev/null >"$run_dir/wrapper.stdout.log" 2>"$run_dir/wrapper.stderr.log" &
+    fi
+    wrapper=$!
+    echo "$wrapper" >"$run_dir/wrapper.pid"
+    chown "$RUN_OWNER:$RUN_GROUP" "$run_dir/wrapper.pid"
+    sleep 0.05
+    if ! kill -0 "$wrapper" 2>/dev/null && [[ ! -s $run_dir/process_status.json ]]; then
+        echo "ERROR=generator_wrapper_failed_to_start" >&2
+        [[ -s $run_dir/wrapper.stderr.log ]] && tail -n 20 "$run_dir/wrapper.stderr.log" >&2 || true
+        exit 5
+    fi
+    printf '{"state":"submitted","run_dir":%s,"wrapper_pid":%s}\n' "$(json_escape "$run_dir")" "$wrapper"
+}
+
+run_status() {
+    run_id=${1:-}; safe_id "$run_id"; run_dir="$RUN_ROOT/$run_id"
+    if [[ ! -d $run_dir ]]; then echo '{"state":"missing"}'; return 0; fi
+    if [[ -s $run_dir/process_status.json ]]; then cat "$run_dir/process_status.json"; else
+        wrapper=""; [[ -s $run_dir/wrapper.pid ]] && wrapper=$(cat "$run_dir/wrapper.pid")
+        if [[ -n $wrapper ]] && kill -0 "$wrapper" 2>/dev/null; then state=starting; else state=unknown; fi
+        printf '{"state":%s,"run_dir":%s}\n' "$(json_escape "$state")" "$(json_escape "$run_dir")"
+    fi
+}
+
+run_stop() {
+    require_root
+    run_id=${1:-}; grace=${2:-10}; safe_id "$run_id"
+    is_uint "$grace" || { echo "ERROR=invalid_grace" >&2; exit 2; }
+    run_dir="$RUN_ROOT/$run_id"
+    [[ -d $run_dir ]] || { echo '{"state":"missing","forced":false}'; return 0; }
+    terminal_state=$(terminal_process_state "$run_dir/process_status.json" 2>/dev/null || true)
+    if [[ -n $terminal_state ]]; then
+        printf '{"state":"already_finished","terminal_state":%s,"forced":false}\n' "$(json_escape "$terminal_state")"
+        return 0
+    fi
+    pid=""; wrapper=""
+    [[ -s $run_dir/generator.pid ]] && pid=$(cat "$run_dir/generator.pid")
+    [[ -s $run_dir/wrapper.pid ]] && wrapper=$(cat "$run_dir/wrapper.pid")
+    if [[ -n $pid ]] && kill -0 "$pid" 2>/dev/null; then
+        kill -TERM -- "-$pid" 2>/dev/null || kill -TERM "$pid" 2>/dev/null || true
+    fi
+    if [[ -n $wrapper ]] && kill -0 "$wrapper" 2>/dev/null; then
+        kill -TERM "$wrapper" 2>/dev/null || true
+    fi
+    local waited=0 generator_alive=0 wrapper_alive=0
+    while (( waited < grace )); do
+        generator_alive=0; [[ -n $pid ]] && kill -0 "$pid" 2>/dev/null && generator_alive=1 || true
+        wrapper_alive=0; [[ -n $wrapper ]] && kill -0 "$wrapper" 2>/dev/null && wrapper_alive=1 || true
+        (( generator_alive == 0 && wrapper_alive == 0 )) && break
+        sleep 1
+        ((waited+=1))
+    done
+    local forced=false
+    if [[ -n $pid ]] && kill -0 "$pid" 2>/dev/null; then
+        kill -KILL -- "-$pid" 2>/dev/null || kill -KILL "$pid" 2>/dev/null || true
+        forced=true
+    fi
+    if [[ -n $wrapper ]] && kill -0 "$wrapper" 2>/dev/null; then
+        kill -KILL "$wrapper" 2>/dev/null || true
+        forced=true
+    fi
+    printf '{"state":"stopped","forced":%s}
+' "$forced"
+}
+
+collect_state() {
+    require_root
+    run_id=${1:-}; safe_id "$run_id"; run_dir="$RUN_ROOT/$run_id"; install -d -m 0755 -o "$RUN_OWNER" -g "$RUN_GROUP" "$run_dir/state"
+    uname -a >"$run_dir/state/uname.txt" 2>&1 || true
+    ip -br address >"$run_dir/state/ip-address.txt" 2>&1 || true
+    ip route >"$run_dir/state/ip-route.txt" 2>&1 || true
+    lspci -nnk -s "$PCI_ADDRESS" >"$run_dir/state/pci.txt" 2>&1 || true
+    cat /proc/meminfo | grep -i huge >"$run_dir/state/hugepages.txt" 2>&1 || true
+    chown -R "$RUN_OWNER:$RUN_GROUP" "$run_dir/state"
+    printf '{"state":"collected","run_dir":%s}\n' "$(json_escape "$run_dir")"
+}
+
+iperf_run() {
+    require_root
+    [[ $# -ge 6 ]] || { echo "ERROR=iperf_arguments" >&2; exit 2; }
+    run_id=$1 test_name=$2 duration=$3 parallel=$4 direction=$5 port=$6; shift 6
+    safe_id "$run_id"; safe_id "$test_name"
+    is_uint "$duration" && (( duration > 0 )) || { echo "ERROR=invalid_iperf_duration" >&2; exit 2; }
+    is_uint "$parallel" && (( parallel > 0 )) || { echo "ERROR=invalid_iperf_parallel" >&2; exit 2; }
+    is_uint "$port" && (( port > 0 && port <= 65535 )) || { echo "ERROR=invalid_iperf_port" >&2; exit 2; }
+    iperf_preflight >/dev/null
+    run_dir="$RUN_ROOT/$run_id/iperf/$test_name"; install -d -m 0755 -o "$RUN_OWNER" -g "$RUN_GROUP" "$run_dir"
+    cmd=("$IPERF3" -c "$DUT_ADDRESS" -p "$port" -t "$duration" -P "$parallel" -J)
+    [[ $direction == reverse ]] && cmd+=(-R)
+    if [[ $direction == udp ]]; then
+        [[ $# -eq 1 ]] || { echo "ERROR=udp_rate_required" >&2; exit 2; }
+        [[ $1 =~ ^[0-9]+([.][0-9]+)?[KMG]?$ ]] || { echo "ERROR=invalid_udp_rate" >&2; exit 2; }
+        cmd+=(-u -b "$1")
+    elif [[ $direction != forward && $direction != reverse ]]; then echo "ERROR=invalid_direction" >&2; exit 2; fi
+    ip -s link show dev "$DATA_INTERFACE" >"$run_dir/link-before.txt" 2>&1 || true
+    ethtool "$DATA_INTERFACE" >"$run_dir/ethtool.txt" 2>&1 || true
+    set +e
+    "${cmd[@]}" >"$run_dir/client.json" 2>"$run_dir/client.stderr.log"
+    rc=$?
+    set -e
+    echo "$rc" >"$run_dir/client.exit_code"
+    ip -s link show dev "$DATA_INTERFACE" >"$run_dir/link-after.txt" 2>&1 || true
+    ethtool -S "$DATA_INTERFACE" >"$run_dir/ethtool-stats.txt" 2>&1 || true
+    chown -R "$RUN_OWNER:$RUN_GROUP" "$run_dir"
+    printf '{"state":"finished","exit_code":%s,"run_dir":%s}\n' "$rc" "$(json_escape "$run_dir")"
+    return "$rc"
+}
+
+case "${1:-}" in
+    preflight) shift; preflight "$@" ;;
+    iperf-preflight) shift; iperf_preflight "$@" ;;
+    run-start) shift; run_start "$@" ;;
+    run-status) shift; run_status "$@" ;;
+    run-stop) shift; run_stop "$@" ;;
+    collect-state) shift; collect_state "$@" ;;
+    archive-run) shift; archive_run "$@" ;;
+    iperf-run) shift; iperf_run "$@" ;;
+    clock-ns) now_ns ;;
+    clock-probe) clock_probe ;;
+    *) echo "Usage: $0 preflight BACKEND|iperf-preflight|run-start RUN_ID SCENARIO WORKLOAD MODE BACKEND RATE DURATION MAX_INFLIGHT RECORD_CONNECTIONS START_NS|run-status RUN_ID|run-stop RUN_ID [GRACE]|collect-state RUN_ID|archive-run RUN_ID|iperf-run RUN_ID TEST DURATION PARALLEL forward|reverse|udp PORT [RATE]|clock-ns|clock-probe" >&2; exit 2 ;;
+esac

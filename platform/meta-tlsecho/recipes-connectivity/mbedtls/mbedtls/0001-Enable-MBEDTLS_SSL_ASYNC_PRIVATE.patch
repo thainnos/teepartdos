@@ -1,0 +1,23 @@
+From 3516f43904f9e2676a41fffa3f2b72ea32af7372 Mon Sep 17 00:00:00 2001
+From: Florian Foerster <florian.foerster@tha.de>
+Date: Fri, 12 Jun 2026 09:50:43 +0000
+Subject: [PATCH] ssl: enable MBEDTLS_SSL_ASYNC_PRIVATE
+Upstream-Status: Inappropriate [local configuration]
+
+---
+ include/mbedtls/mbedtls_config.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/include/mbedtls/mbedtls_config.h b/include/mbedtls/mbedtls_config.h
+index bd3f71d5bc..0a0bf25ff0 100644
+--- a/include/mbedtls/mbedtls_config.h
++++ b/include/mbedtls/mbedtls_config.h
+@@ -1620,7 +1620,7 @@
+  *
+  * Requires: MBEDTLS_X509_CRT_PARSE_C
+  */
+-//#define MBEDTLS_SSL_ASYNC_PRIVATE
++#define MBEDTLS_SSL_ASYNC_PRIVATE
+ 
+ /**
+  * \def MBEDTLS_SSL_CONTEXT_SERIALIZATION

@@ -1,0 +1,10 @@
+# external-tool runner configuration for TCP SYN flood using hping3.
+
+[external]
+label = "tcp-syn"
+command = ["/usr/sbin/hping3", "-d", "256", "-S", "-w", "64", "-p", "4433", "--flood", "--rand-source", "172.10.10.150"]
+interface = "enp1s0"
+stop_signal = "SIGINT"
+stop_grace_s = 5.0
+require_tx_packets = true
+# cwd = "/optional/working/directory"

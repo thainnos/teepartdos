@@ -1,0 +1,183 @@
+From a58415e1a69e24c8cf01785f310f0b1260ed4384 Mon Sep 17 00:00:00 2001
+From: Florian Foerster <florian.foerster@tha.de>
+Date: Tue, 30 Jun 2026 16:17:36 +0000
+Subject: [PATCH] ssl_tls13: add synchronous external server signing
+
+Route TLS 1.3 server CertificateVerify signing through the existing
+asynchronous private-key callbacks when configured. Only immediate
+completion is supported; deferred completion is rejected explicitly.
+
+Upstream-Status: Inappropriate [local experimental research extension]
+---
+ library/ssl_tls13_generic.c | 151 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 151 insertions(+)
+
+diff --git a/library/ssl_tls13_generic.c b/library/ssl_tls13_generic.c
+index b6d09788ba..0dcc33f4fa 100644
+--- a/library/ssl_tls13_generic.c
++++ b/library/ssl_tls13_generic.c
+@@ -895,6 +895,116 @@ int mbedtls_ssl_tls13_check_sig_alg_cert_key_match(uint16_t sig_alg,
+     return 0;
+ }
+ 
++#if defined(MBEDTLS_SSL_ASYNC_PRIVATE) && \
++    defined(MBEDTLS_SSL_TLS1_3_SERVER_EXTERNAL_SIGNING)
++MBEDTLS_CHECK_RETURN_CRITICAL
++static int ssl_tls13_try_external_server_signing(
++    mbedtls_ssl_context *ssl,
++    mbedtls_md_type_t md_alg,
++    const unsigned char *hash,
++    size_t hash_len,
++    unsigned char *signature,
++    size_t signature_size,
++    size_t *signature_len,
++    int *handled)
++{
++    int ret;
++    mbedtls_x509_crt *own_cert;
++
++    *handled = 0;
++    *signature_len = 0;
++
++    if (ssl->conf->endpoint != MBEDTLS_SSL_IS_SERVER ||
++        ssl->conf->f_async_sign_start == NULL) {
++        return 0;
++    }
++
++    if (ssl->conf->f_async_resume == NULL) {
++        MBEDTLS_SSL_DEBUG_MSG(
++            1,
++            ("TLS 1.3 external signer configured without a resume callback"));
++        return MBEDTLS_ERR_SSL_INTERNAL_ERROR;
++    }
++
++    own_cert = mbedtls_ssl_own_cert(ssl);
++    if (own_cert == NULL) {
++        MBEDTLS_SSL_DEBUG_MSG(
++            1,
++            ("TLS 1.3 external signer has no configured certificate"));
++        return MBEDTLS_ERR_SSL_INTERNAL_ERROR;
++    }
++
++    MBEDTLS_SSL_DEBUG_MSG(
++        2,
++        ("TLS 1.3 CertificateVerify backend: external"));
++
++    ret = ssl->conf->f_async_sign_start(ssl,
++                                        own_cert,
++                                        md_alg,
++                                        hash,
++                                        hash_len);
++    if (ret == MBEDTLS_ERR_SSL_HW_ACCEL_FALLTHROUGH) {
++        MBEDTLS_SSL_DEBUG_MSG(
++            2,
++            ("TLS 1.3 external signer requested software fallback"));
++        mbedtls_ssl_set_async_operation_data(ssl, NULL);
++        return 0;
++    }
++
++    if (ret == MBEDTLS_ERR_SSL_ASYNC_IN_PROGRESS) {
++        MBEDTLS_SSL_DEBUG_MSG(
++            1,
++            ("TLS 1.3 deferred external signing is unsupported"));
++
++        if (ssl->conf->f_async_cancel != NULL) {
++            ssl->conf->f_async_cancel(ssl);
++        }
++        mbedtls_ssl_set_async_operation_data(ssl, NULL);
++        return MBEDTLS_ERR_SSL_FEATURE_UNAVAILABLE;
++    }
++
++    if (ret != 0) {
++        MBEDTLS_SSL_DEBUG_RET(1, "f_async_sign_start", ret);
++        mbedtls_ssl_set_async_operation_data(ssl, NULL);
++        return ret;
++    }
++
++    ret = ssl->conf->f_async_resume(ssl,
++                                    signature,
++                                    signature_len,
++                                    signature_size);
++    if (ret == MBEDTLS_ERR_SSL_ASYNC_IN_PROGRESS) {
++        MBEDTLS_SSL_DEBUG_MSG(
++            1,
++            ("TLS 1.3 deferred external signing is unsupported"));
++
++        if (ssl->conf->f_async_cancel != NULL) {
++            ssl->conf->f_async_cancel(ssl);
++        }
++        mbedtls_ssl_set_async_operation_data(ssl, NULL);
++        return MBEDTLS_ERR_SSL_FEATURE_UNAVAILABLE;
++    }
++
++    mbedtls_ssl_set_async_operation_data(ssl, NULL);
++
++    if (ret != 0) {
++        MBEDTLS_SSL_DEBUG_RET(1, "f_async_resume", ret);
++        return ret;
++    }
++
++    *handled = 1;
++
++    MBEDTLS_SSL_DEBUG_MSG(
++        2,
++        ("TLS 1.3 external CertificateVerify signature length: %"
++         MBEDTLS_PRINTF_SIZET,
++         *signature_len));
++
++    return 0;
++}
++#endif /* MBEDTLS_SSL_ASYNC_PRIVATE &&
++          MBEDTLS_SSL_TLS1_3_SERVER_EXTERNAL_SIGNING */
++
+ MBEDTLS_CHECK_RETURN_CRITICAL
+ static int ssl_tls13_write_certificate_verify_body(mbedtls_ssl_context *ssl,
+                                                    unsigned char *buf,
+@@ -985,6 +1095,47 @@ static int ssl_tls13_write_certificate_verify_body(mbedtls_ssl_context *ssl,
+ 
+         MBEDTLS_SSL_DEBUG_BUF(3, "verify hash", verify_hash, verify_hash_len);
+ 
++#if defined(MBEDTLS_SSL_ASYNC_PRIVATE) && \
++    defined(MBEDTLS_SSL_TLS1_3_SERVER_EXTERNAL_SIGNING)
++        {
++            int external_handled = 0;
++
++            ret = ssl_tls13_try_external_server_signing(
++                ssl,
++                md_alg,
++                verify_hash,
++                verify_hash_len,
++                p + 4,
++                (size_t) (end - (p + 4)),
++                &signature_len,
++                &external_handled);
++            if (ret != 0) {
++                MBEDTLS_SSL_DEBUG_MSG(
++                    2,
++                    ("CertificateVerify external signature failed with %s",
++                     mbedtls_ssl_sig_alg_to_str(*sig_alg)));
++                MBEDTLS_SSL_DEBUG_RET(
++                    2,
++                    "TLS 1.3 external CertificateVerify signing",
++                    ret);
++                continue;
++            }
++
++            if (external_handled != 0) {
++                MBEDTLS_SSL_DEBUG_MSG(
++                    2,
++                    ("CertificateVerify signature with %s",
++                     mbedtls_ssl_sig_alg_to_str(*sig_alg)));
++                break;
++            }
++        }
++#endif /* MBEDTLS_SSL_ASYNC_PRIVATE &&
++          MBEDTLS_SSL_TLS1_3_SERVER_EXTERNAL_SIGNING */
++
++        MBEDTLS_SSL_DEBUG_MSG(
++            2,
++            ("TLS 1.3 CertificateVerify backend: software"));
++
+         if ((ret = mbedtls_pk_sign_ext(pk_type, own_key,
+                                        md_alg, verify_hash, verify_hash_len,
+                                        p + 4, (size_t) (end - (p + 4)), &signature_len,

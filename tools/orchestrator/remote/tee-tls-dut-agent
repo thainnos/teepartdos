@@ -1,0 +1,565 @@
+#!/bin/sh
+set -eu
+
+# Non-login SSH shells and minimal embedded images may omit sbin directories.
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+LANG=C
+LC_ALL=C
+export PATH LANG LC_ALL
+
+CONFIG=${TEE_TLS_DUT_AGENT_CONFIG:-/etc/tee-tls-orchestrator/dut-agent.conf}
+[ -r "$CONFIG" ] || { echo "ERROR=missing_agent_config:$CONFIG" >&2; exit 2; }
+# shellcheck disable=SC1090
+. "$CONFIG"
+
+require_root() { [ "$(id -u)" -eq 0 ] || { echo "ERROR=root_required" >&2; exit 2; }; }
+safe_id() { echo "$1" | grep -Eq '^[A-Za-z0-9._-]{1,128}$' || { echo "ERROR=invalid_run_id" >&2; exit 2; }; }
+safe_scenario() { echo "$1" | grep -Eq '^[A-E]$' || { echo "ERROR=invalid_scenario" >&2; exit 2; }; }
+safe_profile() { [ "$1" = pilot-debug ] || [ "$1" = measurement ] || { echo "ERROR=invalid_profile" >&2; exit 2; }; }
+is_uint() { case "$1" in *[!0-9]*|'') return 1 ;; *) return 0 ;; esac; }
+require_cmd() {
+    command -v "$1" >/dev/null 2>&1 || { echo "FAIL=missing_command:$1"; return 1; }
+}
+now_ns() {
+    value=$(date +%s%N 2>/dev/null) || { echo "ERROR=clock_command_failed" >&2; exit 4; }
+    case "$value" in *[!0-9]*|'') echo "ERROR=nanosecond_clock_unsupported:$value" >&2; exit 4 ;; esac
+    printf '%s\n' "$value"
+}
+clock_probe() {
+    printf 'READY\n'
+    while IFS= read -r probe_id; do
+        case "$probe_id" in *[!0-9]*|'') echo "ERROR=invalid_clock_probe_id" >&2; exit 2 ;; esac
+        printf '%s %s\n' "$probe_id" "$(now_ns)"
+    done
+}
+scenario_binary() {
+    case "$1" in
+        A) printf '%s\n' "$SCENARIO_A_BINARY" ;;
+        B) printf '%s\n' "$SCENARIO_B_BINARY" ;;
+        C) printf '%s\n' "$SCENARIO_C_BINARY" ;;
+        D) printf '%s\n' "$SCENARIO_D_BINARY" ;;
+        E) printf '%s\n' "$SCENARIO_E_BINARY" ;;
+        *) exit 2 ;;
+    esac
+}
+append_scenario_args() {
+    scenario=$1 profile=$2
+    case "$scenario" in
+        A) ;;
+        B)
+            set -- "$@" --tee-derive-on-handshake off
+            if [ "$profile" = pilot-debug ]; then
+                set -- "$@" --tee-selftest on --ticket-debug-hashes on
+            else
+                set -- "$@" --tee-selftest off --ticket-debug-hashes off
+            fi
+            ;;
+        C)
+            set -- "$@" --external-signing on
+            if [ "$profile" = pilot-debug ]; then
+                set -- "$@" --tee-selftest on --async-debug-events on
+            else
+                set -- "$@" --tee-selftest off --async-debug-events off
+            fi
+            ;;
+        D)
+            set -- "$@" --crypto-backend on
+            if [ "$profile" = pilot-debug ]; then
+                set -- "$@" --tee-selftest on
+            else
+                set -- "$@" --tee-selftest off
+            fi
+            ;;
+        E)
+            set -- "$@" --tee-ticket-protection on --external-signing on --crypto-backend on
+            if [ "$profile" = pilot-debug ]; then
+                set -- "$@" --tee-selftest on --ticket-debug-hashes on
+            else
+                set -- "$@" --tee-selftest off --ticket-debug-hashes off
+            fi
+            ;;
+    esac
+    # Print NUL-separated arguments to a temporary file is cumbersome in POSIX sh.
+    # This function is used only inside server_start, which repeats the case directly.
+    return 0
+}
+
+check_tar_support() {
+    test_dir="$RUN_ROOT/.tar-preflight.$$"
+    rm -rf "$test_dir"
+    mkdir -p "$test_dir"
+    printf 'ok\n' >"$test_dir/probe"
+    if ! tar -C "$test_dir" -cf /dev/null . >/dev/null 2>&1; then
+        rm -rf "$test_dir"
+        return 1
+    fi
+    rm -rf "$test_dir"
+    return 0
+}
+
+server_cli_check() {
+    scenario=$1
+    binary=$(scenario_binary "$scenario")
+    help=$("$binary" --help 2>&1) || { echo "FAIL=server_help_${scenario}"; return 1; }
+    for option in --bind-ip --port --cert --key --log-file --session-tickets --session-cache \
+                  --strict-cert-profile --log-mode --debug-level --max-payload --listen-backlog \
+                  --max-connections --handshake-timeout-ms --idle-timeout-ms --summary-interval-ms; do
+        echo "$help" | grep -q -- "$option" || { echo "FAIL=server_option_${scenario}:$option"; return 1; }
+    done
+    case "$scenario" in
+        A) ;;
+        B) for option in --tee-derive-on-handshake --tee-selftest --ticket-debug-hashes; do echo "$help" | grep -q -- "$option" || { echo "FAIL=server_option_B:$option"; return 1; }; done ;;
+        C) for option in --external-signing --tee-selftest --async-debug-events; do echo "$help" | grep -q -- "$option" || { echo "FAIL=server_option_C:$option"; return 1; }; done ;;
+        D) for option in --crypto-backend --tee-selftest; do echo "$help" | grep -q -- "$option" || { echo "FAIL=server_option_D:$option"; return 1; }; done ;;
+        E) for option in --tee-ticket-protection --external-signing --crypto-backend --tee-selftest --ticket-debug-hashes; do echo "$help" | grep -q -- "$option" || { echo "FAIL=server_option_E:$option"; return 1; }; done ;;
+    esac
+    return 0
+}
+
+
+iperf_cli_check() {
+    help=$("$IPERF3" --help 2>&1) || { echo "FAIL=iperf3_help"; return 1; }
+    for option in --server --one-off --port --json; do
+        echo "$help" | grep -q -- "$option" || { echo "FAIL=iperf3_option:$option"; return 1; }
+    done
+    return 0
+}
+
+archive_run() {
+    run_id=$1
+    safe_id "$run_id"
+    run_dir="$RUN_ROOT/$run_id"
+    [ -d "$run_dir" ] || { echo "ERROR=missing_run_directory:$run_dir" >&2; exit 3; }
+    command -v tar >/dev/null 2>&1 || { echo "ERROR=tar_missing" >&2; exit 4; }
+    # Binary archive data is the only stdout output from this command.
+    exec tar -C "$run_dir" -cf - .
+}
+
+server_worker() {
+    require_root
+    run_id=$1 scenario=$2 profile=$3
+    safe_id "$run_id"; safe_scenario "$scenario"; safe_profile "$profile"
+    run_dir="$RUN_ROOT/$run_id"
+    [ -d "$run_dir" ] || { echo "ERROR=missing_run_directory:$run_dir" >&2; exit 3; }
+
+    binary=$(scenario_binary "$scenario")
+    [ -x "$binary" ] || { echo "ERROR=server_binary_not_executable:$binary" >&2; exit 4; }
+    [ -r "$SERVER_CERT" ] || { echo "ERROR=missing_certificate" >&2; exit 4; }
+    [ -r "$SERVER_KEY" ] || { echo "ERROR=missing_private_key" >&2; exit 4; }
+    taskset -c "$SERVER_CPU" true >/dev/null 2>&1 || { echo "ERROR=server_cpu_unusable:$SERVER_CPU" >&2; exit 4; }
+
+    if [ "$profile" = pilot-debug ]; then log_mode=debug; debug_level=2; else log_mode=measurement; debug_level=0; fi
+    server_log="$run_dir/server.log"
+    stdout_log="$run_dir/server.stdout.log"
+    stderr_log="$run_dir/server.stderr.log"
+
+    echo "$(now_ns)" >"$run_dir/wrapper_start_utc_ns"
+    set -- taskset -c "$SERVER_CPU" "$binary" \
+        --bind-ip "$DATA_ADDRESS" --port "$TLS_PORT" \
+        --cert "$SERVER_CERT" --key "$SERVER_KEY" --log-file "$server_log" \
+        --session-tickets on --session-cache off --strict-cert-profile on \
+        --log-mode "$log_mode" --debug-level "$debug_level" \
+        --max-payload "$MAX_PAYLOAD" --listen-backlog "$LISTEN_BACKLOG" \
+        --max-connections "$MAX_CONNECTIONS" --handshake-timeout-ms "$HANDSHAKE_TIMEOUT_MS" \
+        --idle-timeout-ms "$IDLE_TIMEOUT_MS" --summary-interval-ms "$SUMMARY_INTERVAL_MS"
+    case "$scenario" in
+        A) ;;
+        B)
+            set -- "$@" --tee-derive-on-handshake off
+            if [ "$profile" = pilot-debug ]; then set -- "$@" --tee-selftest on --ticket-debug-hashes on; else set -- "$@" --tee-selftest off --ticket-debug-hashes off; fi
+            ;;
+        C)
+            set -- "$@" --external-signing on
+            if [ "$profile" = pilot-debug ]; then set -- "$@" --tee-selftest on --async-debug-events on; else set -- "$@" --tee-selftest off --async-debug-events off; fi
+            ;;
+        D)
+            set -- "$@" --crypto-backend on
+            if [ "$profile" = pilot-debug ]; then set -- "$@" --tee-selftest on; else set -- "$@" --tee-selftest off; fi
+            ;;
+        E)
+            set -- "$@" --tee-ticket-protection on --external-signing on --crypto-backend on
+            if [ "$profile" = pilot-debug ]; then set -- "$@" --tee-selftest on --ticket-debug-hashes on; else set -- "$@" --tee-selftest off --ticket-debug-hashes off; fi
+            ;;
+    esac
+    printf '%s\n' "$@" >"$run_dir/server.command.argv"
+    "$@" >"$stdout_log" 2>"$stderr_log" &
+    child=$!
+    echo "$child" >"$run_dir/server.pid"
+    stop_requested=0
+    trap 'stop_requested=1; kill -TERM "$child" 2>/dev/null || true' TERM INT
+
+    i=0
+    allowed=""
+    while [ "$i" -lt 40 ]; do
+        grep '^Cpus_allowed_list:' "/proc/$child/status" >"$run_dir/server.affinity" 2>/dev/null || true
+        allowed=$(sed -n 's/^Cpus_allowed_list:[[:space:]]*//p' "$run_dir/server.affinity" 2>/dev/null || true)
+        [ "$allowed" = "$SERVER_CPU" ] && break
+        kill -0 "$child" 2>/dev/null || break
+        sleep 0.05
+        i=$((i+1))
+    done
+    if [ "$allowed" != "$SERVER_CPU" ]; then
+        echo "affinity verification failed: expected $SERVER_CPU observed ${allowed:-missing}" >"$run_dir/startup.error"
+        kill -TERM "$child" 2>/dev/null || true
+    fi
+
+    set +e
+    wait "$child"
+    rc=$?
+    if [ "$stop_requested" -eq 1 ]; then
+        # A signal can interrupt the shell's first wait before the child has
+        # completed its own graceful SIGTERM handling. Reap it again and keep
+        # the child's terminal status instead of recording the wrapper's 143.
+        wait "$child"
+        rc2=$?
+        [ "$rc2" -eq 127 ] || rc=$rc2
+    fi
+    set -e
+    echo "$rc" >"$run_dir/server.exit_code"
+    echo "$(now_ns)" >"$run_dir/server_end_utc_ns"
+    echo "$rc" >"$run_dir/wrapper.exit_code"
+    exit "$rc"
+}
+
+server_start() {
+    require_root
+    run_id=$1 scenario=$2 profile=$3
+    safe_id "$run_id"; safe_scenario "$scenario"; safe_profile "$profile"
+    run_dir="$RUN_ROOT/$run_id"
+    [ ! -e "$run_dir" ] || { echo "ERROR=run_directory_exists" >&2; exit 3; }
+    mkdir -p "$run_dir"
+    chmod 0755 "$run_dir"
+
+    binary=$(scenario_binary "$scenario")
+    [ -x "$binary" ] || { echo "ERROR=server_binary_not_executable:$binary" >&2; exit 4; }
+    [ -r "$SERVER_CERT" ] || { echo "ERROR=missing_certificate" >&2; exit 4; }
+    [ -r "$SERVER_KEY" ] || { echo "ERROR=missing_private_key" >&2; exit 4; }
+    taskset -c "$SERVER_CPU" true >/dev/null 2>&1 || { echo "ERROR=server_cpu_unusable:$SERVER_CPU" >&2; exit 4; }
+
+    : >"$run_dir/server.log"
+    : >"$run_dir/server.stdout.log"
+    : >"$run_dir/server.stderr.log"
+    : >"$run_dir/wrapper.stdout.log"
+    : >"$run_dir/wrapper.stderr.log"
+
+    # The worker must not retain the SSH channel's stdin/stdout/stderr. Otherwise
+    # ssh waits for EOF from the long-running background process and the local
+    # server-start command times out even though the server has started.
+    if command -v setsid >/dev/null 2>&1; then
+        nohup setsid "$0" server-worker "$run_id" "$scenario" "$profile" \
+            </dev/null >"$run_dir/wrapper.stdout.log" 2>"$run_dir/wrapper.stderr.log" &
+    else
+        nohup "$0" server-worker "$run_id" "$scenario" "$profile" \
+            </dev/null >"$run_dir/wrapper.stdout.log" 2>"$run_dir/wrapper.stderr.log" &
+    fi
+    wrapper=$!
+    echo "$wrapper" >"$run_dir/wrapper.pid"
+
+    sleep 0.05
+    if ! kill -0 "$wrapper" 2>/dev/null && [ ! -s "$run_dir/server.pid" ]; then
+        echo "ERROR=server_worker_failed_to_start" >&2
+        if [ -s "$run_dir/wrapper.stderr.log" ]; then
+            tail -n 20 "$run_dir/wrapper.stderr.log" >&2 || true
+        fi
+        exit 5
+    fi
+
+    echo "RUN_DIR=$run_dir"
+    echo "WRAPPER_PID=$wrapper"
+}
+
+server_status() {
+    run_id=$1; safe_id "$run_id"; run_dir="$RUN_ROOT/$run_id"
+    [ -d "$run_dir" ] || { echo "STATE=missing"; exit 0; }
+
+    pid=""; [ -s "$run_dir/server.pid" ] && pid=$(cat "$run_dir/server.pid")
+    wrapper_pid=""; [ -s "$run_dir/wrapper.pid" ] && wrapper_pid=$(cat "$run_dir/wrapper.pid")
+    # Exit-code files are authoritative. A numerical PID can be reused by an
+    # unrelated process after the experiment child exits.
+    if [ -s "$run_dir/server.exit_code" ] || [ -s "$run_dir/wrapper.exit_code" ]; then
+        state=exited
+    elif [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+        state=running
+    elif [ -n "$wrapper_pid" ] && kill -0 "$wrapper_pid" 2>/dev/null; then
+        state=starting
+    else
+        state=exited
+    fi
+
+    manifest=0; grep -q "manifest scenario=" "$run_dir/server.log" 2>/dev/null && manifest=1 || true
+    affinity=""; [ -s "$run_dir/server.affinity" ] && affinity=$(sed -n 's/^Cpus_allowed_list:[[:space:]]*//p' "$run_dir/server.affinity")
+    exit_code=""; [ -s "$run_dir/server.exit_code" ] && exit_code=$(cat "$run_dir/server.exit_code")
+    wrapper_exit_code=""; [ -s "$run_dir/wrapper.exit_code" ] && wrapper_exit_code=$(cat "$run_dir/wrapper.exit_code")
+    startup_error=""; [ -s "$run_dir/startup.error" ] && startup_error=$(tail -n 1 "$run_dir/startup.error")
+
+    echo "STATE=$state"
+    echo "RUN_DIR=$run_dir"
+    echo "PID=$pid"
+    echo "WRAPPER_PID=$wrapper_pid"
+    echo "MANIFEST_READY=$manifest"
+    echo "AFFINITY=$affinity"
+    echo "EXIT_CODE=$exit_code"
+    echo "WRAPPER_EXIT_CODE=$wrapper_exit_code"
+    echo "STARTUP_ERROR=$startup_error"
+}
+
+server_stop() {
+    require_root
+    run_id=$1 grace=${2:-10}; safe_id "$run_id"; is_uint "$grace" || { echo "ERROR=invalid_grace" >&2; exit 2; }; run_dir="$RUN_ROOT/$run_id"
+    [ -d "$run_dir" ] || { echo "STATE=missing"; exit 0; }
+
+    if [ -s "$run_dir/server.exit_code" ] || [ -s "$run_dir/wrapper.exit_code" ]; then
+        echo "FORCED=0"
+        echo "STATE=already_exited"
+        exit 0
+    fi
+    pid=""; [ -s "$run_dir/server.pid" ] && pid=$(cat "$run_dir/server.pid")
+    wrapper_pid=""; [ -s "$run_dir/wrapper.pid" ] && wrapper_pid=$(cat "$run_dir/wrapper.pid")
+    server_alive=0; [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null && server_alive=1 || true
+    wrapper_alive=0; [ -n "$wrapper_pid" ] && kill -0 "$wrapper_pid" 2>/dev/null && wrapper_alive=1 || true
+
+    if [ "$wrapper_alive" -eq 1 ]; then
+        # With setsid the worker and server share a dedicated process group.
+        # Signal that group first to close the tiny race before the worker has
+        # installed its forwarding trap; fall back to the wrapper PID when the
+        # platform lacks setsid/group ownership.
+        kill -TERM "-$wrapper_pid" 2>/dev/null || kill -TERM "$wrapper_pid" 2>/dev/null || true
+    elif [ "$server_alive" -eq 1 ]; then
+        kill -TERM "$pid" 2>/dev/null || true
+    else
+        echo "FORCED=0"
+        echo "STATE=not_running"
+        exit 0
+    fi
+
+    i=0
+    while [ "$i" -lt "$grace" ]; do
+        server_alive=0; [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null && server_alive=1 || true
+        wrapper_alive=0; [ -n "$wrapper_pid" ] && kill -0 "$wrapper_pid" 2>/dev/null && wrapper_alive=1 || true
+        [ "$server_alive" -eq 0 ] && [ "$wrapper_alive" -eq 0 ] && break
+        sleep 1
+        i=$((i+1))
+    done
+
+    forced=0
+    if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then kill -KILL "$pid" 2>/dev/null || true; forced=1; fi
+    if [ -n "$wrapper_pid" ] && kill -0 "$wrapper_pid" 2>/dev/null; then kill -KILL "-$wrapper_pid" 2>/dev/null || kill -KILL "$wrapper_pid" 2>/dev/null || true; forced=1; fi
+    echo "FORCED=$forced"
+    echo "STATE=stopped"
+}
+
+preflight() {
+    require_root
+    failures=0
+    for command_name in id date grep sed tail taskset ip nohup tar rm mkdir chmod cat kill sleep; do
+        require_cmd "$command_name" || failures=$((failures+1))
+    done
+    if [ "$failures" -ne 0 ]; then echo "FAILURES=$failures"; return 1; fi
+    mkdir -p "$RUN_ROOT" || { echo "FAIL=run_root_unusable:$RUN_ROOT"; failures=$((failures+1)); }
+    [ -d "$RUN_ROOT" ] && [ -w "$RUN_ROOT" ] || { echo "FAIL=run_root_not_writable:$RUN_ROOT"; failures=$((failures+1)); }
+    now_ns >/dev/null 2>&1 || { echo "FAIL=nanosecond_clock"; failures=$((failures+1)); }
+    sleep 0.01 >/dev/null 2>&1 || { echo "FAIL=fractional_sleep_support"; failures=$((failures+1)); }
+    check_tar_support || { echo "FAIL=tar_stream_support"; failures=$((failures+1)); }
+    for scenario in A B C D E; do
+        binary=$(scenario_binary "$scenario")
+        [ -x "$binary" ] || { echo "FAIL=missing_${scenario}:$binary"; failures=$((failures+1)); continue; }
+        server_cli_check "$scenario" || failures=$((failures+1))
+    done
+    [ -r "$SERVER_CERT" ] || { echo "FAIL=missing_cert"; failures=$((failures+1)); }
+    [ -r "$SERVER_KEY" ] || { echo "FAIL=missing_key"; failures=$((failures+1)); }
+    taskset -c "$SERVER_CPU" true >/dev/null 2>&1 || { echo "FAIL=cpu_$SERVER_CPU"; failures=$((failures+1)); }
+    ip -o -4 addr show dev "$DATA_INTERFACE" | grep -q " $DATA_ADDRESS/" || { echo "FAIL=data_address"; failures=$((failures+1)); }
+    ip link show dev "$DATA_INTERFACE" | grep -q "mtu $MTU" || { echo "FAIL=data_mtu"; failures=$((failures+1)); }
+    ip -o -4 addr show dev "$CONTROL_INTERFACE" | grep -q " $CONTROL_ADDRESS/" || { echo "FAIL=control_address"; failures=$((failures+1)); }
+    if command -v setsid >/dev/null 2>&1; then detach_method=setsid; else detach_method=nohup; fi
+    echo "SERVER_CPU=$SERVER_CPU"
+    echo "DETACH_METHOD=$detach_method"
+    echo "ARCHIVE_METHOD=tar-stream"
+    echo "FAILURES=$failures"
+    [ "$failures" -eq 0 ]
+}
+
+iperf_preflight() {
+    require_root
+    failures=0
+    for command_name in id date ip nohup tar rm mkdir kill sleep tail cat grep; do
+        require_cmd "$command_name" || failures=$((failures+1))
+    done
+    if [ "$failures" -ne 0 ]; then echo "FAILURES=$failures"; return 1; fi
+    now_ns >/dev/null 2>&1 || { echo "FAIL=nanosecond_clock"; failures=$((failures+1)); }
+    sleep 0.01 >/dev/null 2>&1 || { echo "FAIL=fractional_sleep_support"; failures=$((failures+1)); }
+    check_tar_support || { echo "FAIL=tar_stream_support"; failures=$((failures+1)); }
+    command -v "$IPERF3" >/dev/null 2>&1 || [ -x "$IPERF3" ] || { echo "FAIL=iperf3_missing"; failures=$((failures+1)); }
+    if command -v "$IPERF3" >/dev/null 2>&1 || [ -x "$IPERF3" ]; then iperf_cli_check || failures=$((failures+1)); fi
+    ip -o -4 addr show dev "$DATA_INTERFACE" | grep -q " $DATA_ADDRESS/" || { echo "FAIL=data_address"; failures=$((failures+1)); }
+    ip link show dev "$DATA_INTERFACE" | grep -q "mtu $MTU" || { echo "FAIL=data_mtu"; failures=$((failures+1)); }
+    ip -o -4 addr show dev "$CONTROL_INTERFACE" | grep -q " $CONTROL_ADDRESS/" || { echo "FAIL=control_address"; failures=$((failures+1)); }
+    echo "FAILURES=$failures"
+    [ "$failures" -eq 0 ]
+}
+
+collect_state() {
+    run_id=$1; safe_id "$run_id"; run_dir="$RUN_ROOT/$run_id"; mkdir -p "$run_dir/state"
+    uname -a >"$run_dir/state/uname.txt" 2>&1 || true
+    ip -br address >"$run_dir/state/ip-address.txt" 2>&1 || true
+    ip route >"$run_dir/state/ip-route.txt" 2>&1 || true
+    ip -s link show dev "$DATA_INTERFACE" >"$run_dir/state/data-link.txt" 2>&1 || true
+    date -u +%Y-%m-%dT%H:%M:%S.%NZ >"$run_dir/state/collected-utc.txt"
+    echo "RUN_DIR=$run_dir"
+}
+
+iperf_worker() {
+    require_root
+    run_id=$1 test_name=$2 port=$3
+    safe_id "$run_id"; safe_id "$test_name"; is_uint "$port" || exit 2
+    run_dir="$RUN_ROOT/$run_id/iperf/$test_name"
+    [ -d "$run_dir" ] || { echo "ERROR=missing_iperf_run_directory" >&2; exit 3; }
+    echo "$(now_ns)" >"$run_dir/wrapper_start_utc_ns"
+    "$IPERF3" -s -1 -p "$port" -J >"$run_dir/server.json" 2>"$run_dir/server.stderr.log" &
+    child=$!
+    echo "$child" >"$run_dir/server.pid"
+    stop_requested=0
+    trap 'stop_requested=1; kill -TERM "$child" 2>/dev/null || true' TERM INT
+    set +e
+    wait "$child"
+    rc=$?
+    if [ "$stop_requested" -eq 1 ]; then
+        wait "$child"
+        rc2=$?
+        [ "$rc2" -eq 127 ] || rc=$rc2
+    fi
+    set -e
+    echo "$rc" >"$run_dir/server.exit_code"
+    echo "$(now_ns)" >"$run_dir/server_end_utc_ns"
+    exit "$rc"
+}
+
+iperf_start() {
+    require_root
+    run_id=$1 test_name=$2 port=$3
+    safe_id "$run_id"; safe_id "$test_name"; is_uint "$port" || { echo "ERROR=invalid_iperf_port" >&2; exit 2; }
+    run_dir="$RUN_ROOT/$run_id/iperf/$test_name"
+    [ ! -e "$run_dir" ] || { echo "ERROR=iperf_already_started" >&2; exit 3; }
+    mkdir -p "$run_dir"
+    : >"$run_dir/server.json"; : >"$run_dir/server.stderr.log"
+    : >"$run_dir/wrapper.stdout.log"; : >"$run_dir/wrapper.stderr.log"
+    if command -v setsid >/dev/null 2>&1; then
+        nohup setsid "$0" iperf-worker "$run_id" "$test_name" "$port" \
+            </dev/null >"$run_dir/wrapper.stdout.log" 2>"$run_dir/wrapper.stderr.log" &
+    else
+        nohup "$0" iperf-worker "$run_id" "$test_name" "$port" \
+            </dev/null >"$run_dir/wrapper.stdout.log" 2>"$run_dir/wrapper.stderr.log" &
+    fi
+    wrapper=$!
+    echo "$wrapper" >"$run_dir/wrapper.pid"
+    sleep 0.05
+    if ! kill -0 "$wrapper" 2>/dev/null && [ ! -s "$run_dir/server.exit_code" ]; then
+        echo "ERROR=iperf_worker_failed_to_start" >&2
+        [ -s "$run_dir/wrapper.stderr.log" ] && tail -n 20 "$run_dir/wrapper.stderr.log" >&2 || true
+        exit 5
+    fi
+    echo "RUN_DIR=$run_dir"
+    echo "WRAPPER_PID=$wrapper"
+}
+
+iperf_status() {
+    run_id=$1 test_name=$2; safe_id "$run_id"; safe_id "$test_name"
+    run_dir="$RUN_ROOT/$run_id/iperf/$test_name"
+    [ -d "$run_dir" ] || { echo "STATE=missing"; exit 0; }
+    wrapper=""; [ -s "$run_dir/wrapper.pid" ] && wrapper=$(cat "$run_dir/wrapper.pid")
+    pid=""; [ -s "$run_dir/server.pid" ] && pid=$(cat "$run_dir/server.pid")
+    if [ -s "$run_dir/server.exit_code" ]; then
+        state=exited
+    elif [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+        state=running
+    elif [ -n "$wrapper" ] && kill -0 "$wrapper" 2>/dev/null; then
+        state=starting
+    else
+        state=exited
+    fi
+    exit_code=""; [ -s "$run_dir/server.exit_code" ] && exit_code=$(cat "$run_dir/server.exit_code")
+    echo "STATE=$state"; echo "RUN_DIR=$run_dir"; echo "PID=$pid"; echo "WRAPPER_PID=$wrapper"; echo "EXIT_CODE=$exit_code"
+}
+
+iperf_stop() {
+    require_root
+    run_id=$1 test_name=$2 grace=${3:-3}
+    safe_id "$run_id"; safe_id "$test_name"; is_uint "$grace" || exit 2
+    run_dir="$RUN_ROOT/$run_id/iperf/$test_name"
+    [ -d "$run_dir" ] || { echo "STATE=missing"; exit 0; }
+    if [ -s "$run_dir/server.exit_code" ]; then
+        echo "STATE=already_exited"; echo "FORCED=0"; exit 0
+    fi
+    wrapper=""; [ -s "$run_dir/wrapper.pid" ] && wrapper=$(cat "$run_dir/wrapper.pid")
+    pid=""; [ -s "$run_dir/server.pid" ] && pid=$(cat "$run_dir/server.pid")
+    if [ -n "$wrapper" ] && kill -0 "$wrapper" 2>/dev/null; then
+        kill -TERM "-$wrapper" 2>/dev/null || kill -TERM "$wrapper" 2>/dev/null || true
+    elif [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+        kill -TERM "$pid" 2>/dev/null || true
+    fi
+    i=0
+    while [ "$i" -lt "$grace" ]; do
+        child_alive=0; [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null && child_alive=1 || true
+        wrapper_alive=0; [ -n "$wrapper" ] && kill -0 "$wrapper" 2>/dev/null && wrapper_alive=1 || true
+        [ "$child_alive" -eq 0 ] && [ "$wrapper_alive" -eq 0 ] && break
+        sleep 1; i=$((i+1))
+    done
+    forced=0
+    if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then kill -KILL "$pid" 2>/dev/null || true; forced=1; fi
+    if [ -n "$wrapper" ] && kill -0 "$wrapper" 2>/dev/null; then kill -KILL "-$wrapper" 2>/dev/null || kill -KILL "$wrapper" 2>/dev/null || true; forced=1; fi
+    echo "STATE=stopped"; echo "FORCED=$forced"
+}
+
+delete_run() {
+    require_root
+    run_id=$1
+    safe_id "$run_id"
+    run_dir="$RUN_ROOT/$run_id"
+
+    [ -e "$run_dir" ] || { echo "STATE=missing"; echo "RUN_ID=$run_id"; exit 0; }
+    [ -d "$run_dir" ] && [ ! -L "$run_dir" ] || {
+        echo "ERROR=unsafe_run_directory:$run_dir" >&2
+        exit 4
+    }
+
+    # Refuse deletion while a non-terminal server/wrapper still appears active.
+    # Terminal status files take precedence so stale/reused PIDs do not block
+    # housekeeping after a completed run.
+    if [ ! -s "$run_dir/server.exit_code" ]; then
+        for pid_file in "$run_dir/server.pid" "$run_dir/wrapper.pid"; do
+            if [ -s "$pid_file" ]; then
+                pid=$(cat "$pid_file" 2>/dev/null || true)
+                if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+                    echo "ERROR=run_still_active:$run_id" >&2
+                    exit 5
+                fi
+            fi
+        done
+    fi
+
+    rm -rf "$run_dir"
+    [ ! -e "$run_dir" ] || {
+        echo "ERROR=delete_failed:$run_dir" >&2
+        exit 6
+    }
+    echo "STATE=deleted"
+    echo "RUN_ID=$run_id"
+}
+case "${1:-}" in
+    preflight) shift; preflight "$@" ;;
+    iperf-preflight) shift; iperf_preflight "$@" ;;
+    server-start) [ "$#" -eq 4 ] || exit 2; shift; server_start "$@" ;;
+    server-worker) [ "$#" -eq 4 ] || exit 2; shift; server_worker "$@" ;;
+    server-status) [ "$#" -eq 2 ] || exit 2; shift; server_status "$@" ;;
+    server-stop) shift; server_stop "$@" ;;
+    collect-state) [ "$#" -eq 2 ] || exit 2; shift; collect_state "$@" ;;
+    archive-run) [ "$#" -eq 2 ] || exit 2; shift; archive_run "$@" ;;
+    delete-run) [ "$#" -eq 2 ] || exit 2; shift; delete_run "$@" ;;
+    iperf-start) [ "$#" -eq 4 ] || exit 2; shift; iperf_start "$@" ;;
+    iperf-worker) [ "$#" -eq 4 ] || exit 2; shift; iperf_worker "$@" ;;
+    iperf-status) [ "$#" -eq 3 ] || exit 2; shift; iperf_status "$@" ;;
+    iperf-stop) shift; iperf_stop "$@" ;;
+    clock-ns) now_ns ;;
+    clock-probe) clock_probe ;;
+    *) echo "Usage: $0 preflight|iperf-preflight|server-start RUN_ID SCENARIO PROFILE|server-status RUN_ID|server-stop RUN_ID [GRACE]|collect-state RUN_ID|archive-run RUN_ID|delete-run RUN_ID|iperf-start RUN_ID TEST PORT|iperf-status RUN_ID TEST|iperf-stop RUN_ID TEST [GRACE]|clock-ns|clock-probe" >&2; exit 2 ;;
+esac

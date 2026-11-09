@@ -1,0 +1,52 @@
+Reference client 0.1.1
+OpenSSL runtime: OpenSSL 3.5.7 9 Jun 2026
+Scenario: C
+Workload: resumption
+Repetition: 4
+Run ID: 20260813T072900Z_C_resumption_flood_7d3fcfd14a
+Duration: 300 s, probe interval: 1000 ms, payload: 1024 bytes
+CSV: /home/referenceuser/TEE_TLS_DoS/results/scenario_C/resumption/resumption/flood/fstack/rate_110p0/repetition_4/20260813T072900Z_C_resumption_flood_7d3fcfd14a/reference/tls_reference_C_resumption_r4_20260813T072900Z_C_resumption_flood_7d3fcfd14a.csv
+Metadata: /home/referenceuser/TEE_TLS_DoS/results/scenario_C/resumption/resumption/flood/fstack/rate_110p0/repetition_4/20260813T072900Z_C_resumption_flood_7d3fcfd14a/reference/tls_reference_C_resumption_r4_20260813T072900Z_C_resumption_flood_7d3fcfd14a.metadata.json
+[resumption] probe=0 result=0 reused=true handshake_us=13405 app_rtt_us=1210
+[resumption] probe=1 result=0 reused=true handshake_us=13519 app_rtt_us=1182
+[resumption] probe=2 result=0 reused=true handshake_us=13161 app_rtt_us=888
+[resumption] probe=3 result=0 reused=true handshake_us=13500 app_rtt_us=1481
+[resumption] probe=4 result=0 reused=true handshake_us=13444 app_rtt_us=1538
+[resumption] probe=5 result=0 reused=true handshake_us=13415 app_rtt_us=1478
+[resumption] probe=6 result=0 reused=true handshake_us=13496 app_rtt_us=1178
+[resumption] probe=7 result=0 reused=true handshake_us=13454 app_rtt_us=1485
+[resumption] probe=8 result=0 reused=true handshake_us=13505 app_rtt_us=1514
+[resumption] probe=9 result=0 reused=true handshake_us=13434 app_rtt_us=1201
+[resumption] probe=10 result=0 reused=true handshake_us=13446 app_rtt_us=1176
+[resumption] probe=11 result=0 reused=true handshake_us=13492 app_rtt_us=1207
+[resumption] probe=12 result=0 reused=true handshake_us=13500 app_rtt_us=1183
+[resumption] probe=13 result=0 reused=true handshake_us=13522 app_rtt_us=1519
+[resumption] probe=14 result=0 reused=true handshake_us=13188 app_rtt_us=918
+[resumption] probe=15 result=0 reused=true handshake_us=13587 app_rtt_us=1198
+[resumption] probe=16 result=0 reused=true handshake_us=13230 app_rtt_us=1234
+[resumption] probe=17 result=0 reused=true handshake_us=13498 app_rtt_us=1511
+[resumption] probe=18 result=0 reused=true handshake_us=13465 app_rtt_us=1172
+[resumption] probe=19 result=0 reused=true handshake_us=13524 app_rtt_us=1179
+[resumption] probe=20 result=0 reused=true handshake_us=13474 app_rtt_us=1182
+[resumption] probe=21 result=0 reused=true handshake_us=13499 app_rtt_us=1175
+[resumption] probe=22 result=0 reused=true handshake_us=13490 app_rtt_us=1186
+[resumption] probe=23 result=0 reused=true handshake_us=13498 app_rtt_us=1190
+[resumption] probe=24 result=0 reused=true handshake_us=13443 app_rtt_us=1182
+[resumption] probe=25 result=0 reused=true handshake_us=82246 app_rtt_us=93713
+[resumption] probe=26 result=0 reused=true handshake_us=236149 app_rtt_us=61759
+[resumption] probe=27 result=0 reused=true handshake_us=389628 app_rtt_us=254796
+[resumption] probe=28 result=0 reused=true handshake_us=535832 app_rtt_us=140102
+[resumption] probe=29 result=0 reused=true handshake_us=692434 app_rtt_us=356948
+[resumption] probe=30 result=0 reused=true handshake_us=847720 app_rtt_us=9191
+[resumption] probe=31 result=0 reused=true handshake_us=1011257 app_rtt_us=996296
+[resumption] probe=32 result=0 reused=true handshake_us=1305137 app_rtt_us=23939
+[resumption] probe=33 result=0 reused=true handshake_us=1374194 app_rtt_us=1251025
+[resumption] probe=34 result=-2 reused=n/a handshake_us=13470 app_rtt_us=n/a
+[resumption] probe=35 result=0 reused=true handshake_us=1396642 app_rtt_us=1229904
+[resumption] probe=36 result=-2 reused=n/a handshake_us=13325 app_rtt_us=n/a
+[resumption] probe=37 result=0 reused=true handshake_us=1460433 app_rtt_us=839031
+[resumption] probe=38 result=-2 reused=n/a handshake_us=8424 app_rtt_us=n/a
+[resumption] probe=39 result=0 reused=true handshake_us=1634709 app_rtt_us=336069
+[resumption] probe=40 result=-2 reused=n/a handshake_us=1803 app_rtt_us=n/a
+[resumption] probe=41 result=0 reused=true handshake_us=1391629 app_rtt_us=1232094
+[resumption] probe=42 result=-2 reused=n/a handshake_us

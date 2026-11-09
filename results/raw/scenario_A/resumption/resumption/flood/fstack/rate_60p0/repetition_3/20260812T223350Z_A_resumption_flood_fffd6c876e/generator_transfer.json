@@ -1,0 +1,10 @@
+{
+  "archive_bytes": 71680,
+  "archive_sha256": "322ac325bc8091fbcb0ff2aa03e6414185633318ef84acb4389b52ba7459b24e",
+  "collected_utc": "2026-08-12T22:39:12.899827565Z",
+  "files": 16,
+  "host": "loadgen",
+  "method": "agent-tar-stream-over-ssh",
+  "payload_bytes": 47758,
+  "run_id": "20260812T223350Z_A_resumption_flood_fffd6c876e"
+}

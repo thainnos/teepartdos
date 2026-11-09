@@ -1,0 +1,450 @@
+From 16d7042f1f6f9fc05486ab6f98a2dadfbc53c7f1 Mon Sep 17 00:00:00 2001
+From: Florian Foerster <florian.foerster@tha.de>
+Date: Fri, 3 Jul 2026 08:35:39 +0000
+Subject: [PATCH] ssl: add TLS 1.3 crypto backend lifecycle framework
+
+Upstream-Status: Inappropriate [local experimental TLS 1.3 TrustZone for Arm Cortex-A research patch]
+
+---
+ include/mbedtls/check_config.h   |   6 ++
+ include/mbedtls/mbedtls_config.h |  14 +++
+ include/mbedtls/ssl.h            | 141 ++++++++++++++++++++++++++
+ library/ssl_tls.c                | 168 +++++++++++++++++++++++++++++++
+ 4 files changed, 329 insertions(+)
+
+diff --git a/include/mbedtls/check_config.h b/include/mbedtls/check_config.h
+index c56fc8d6b1..ab58479624 100644
+--- a/include/mbedtls/check_config.h
++++ b/include/mbedtls/check_config.h
+@@ -884,6 +884,12 @@
+ #error "MBEDTLS_SSL_TLS1_3_SERVER_EXTERNAL_SIGNING defined, but not all prerequisites"
+ #endif
+ 
++#if defined(MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND) && \
++    (!defined(MBEDTLS_SSL_PROTO_TLS1_3) || \
++     !defined(MBEDTLS_SSL_TLS_C))
++#error "MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND defined, but not all prerequisites"
++#endif
++
+ #if defined(MBEDTLS_SSL_TLS_C) && !(defined(MBEDTLS_CIPHER_C) || \
+     defined(MBEDTLS_USE_PSA_CRYPTO))
+ #error "MBEDTLS_SSL_TLS_C defined, but not all prerequisites"
+diff --git a/include/mbedtls/mbedtls_config.h b/include/mbedtls/mbedtls_config.h
+index 0c85c53e2b..f10330edb3 100644
+--- a/include/mbedtls/mbedtls_config.h
++++ b/include/mbedtls/mbedtls_config.h
+@@ -1643,6 +1643,20 @@
+  */
+ #define MBEDTLS_SSL_L1_PATCH_VERSION 1
+ 
++/**
++ * \def MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND
++ *
++ * Local experimental extension for the TrustZone TLS study.
++ *
++ * Enable registration and per-connection lifecycle management for an
++ * application-provided TLS 1.3 cryptographic backend. Enabling this option
++ * does not offload cryptographic operations by itself.
++ *
++ * Requires: MBEDTLS_SSL_PROTO_TLS1_3
++ * Requires: MBEDTLS_SSL_TLS_C
++ */
++#define MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND
++
+ /**
+  * \def MBEDTLS_SSL_CONTEXT_SERIALIZATION
+  *
+diff --git a/include/mbedtls/ssl.h b/include/mbedtls/ssl.h
+index 42fffbf860..fe2b62a4af 100644
+--- a/include/mbedtls/ssl.h
++++ b/include/mbedtls/ssl.h
+@@ -1150,6 +1150,92 @@ typedef int mbedtls_ssl_async_resume_t(mbedtls_ssl_context *ssl,
+ typedef void mbedtls_ssl_async_cancel_t(mbedtls_ssl_context *ssl);
+ #endif /* MBEDTLS_SSL_ASYNC_PRIVATE */
+ 
++#if defined(MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND)
++
++/** Local TLS 1.3 cryptographic-backend API revision. */
++#define MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND_API_VERSION 1u
++
++/** The backend provides per-connection lifecycle callbacks. */
++#define MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND_CAP_CONNECTION_LIFECYCLE 0x00000001u
++
++/** The backend can own per-transform state and release it on transform free. */
++#define MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND_CAP_TRANSFORM_LIFECYCLE  0x00000002u
++
++/** Capabilities known by API revision 1. */
++#define MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND_CAP_MASK \
++    (MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND_CAP_CONNECTION_LIFECYCLE | \
++     MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND_CAP_TRANSFORM_LIFECYCLE)
++
++/**
++ * \brief Initialize backend state for one SSL connection.
++ *
++ * This callback is invoked by mbedtls_ssl_setup() and again after each
++ * successful mbedtls_ssl_session_reset(). It may allocate application-owned
++ * connection state and return it through \p connection_data.
++ *
++ * \param ssl              The SSL connection being initialized.
++ * \param config_data      The pointer supplied when registering the backend.
++ * \param connection_data  On success, receives the application-owned
++ *                         per-connection backend state. This may be NULL.
++ *
++ * \return 0 on success.
++ * \return Any non-zero value to abort SSL setup or reset.
++ */
++typedef int mbedtls_ssl_tls13_crypto_backend_connection_init_t(
++    mbedtls_ssl_context *ssl,
++    void *config_data,
++    void **connection_data);
++
++/**
++ * \brief Release backend state for one SSL connection.
++ *
++ * Mbed TLS invokes this callback only after all transforms belonging to the
++ * connection have been released.
++ *
++ * \param ssl              The SSL connection being released.
++ * \param config_data      The pointer supplied when registering the backend.
++ * \param connection_data  The value returned by the initialization callback.
++ */
++typedef void mbedtls_ssl_tls13_crypto_backend_connection_free_t(
++    mbedtls_ssl_context *ssl,
++    void *config_data,
++    void *connection_data);
++
++/**
++ * \brief Release application-owned state attached to an external transform.
++ *
++ * \param config_data      The backend configuration pointer.
++ * \param connection_data  The per-connection backend state.
++ * \param transform_data   The application-owned transform state.
++ */
++typedef void mbedtls_ssl_tls13_crypto_backend_transform_free_t(
++    void *config_data,
++    void *connection_data,
++    void *transform_data);
++
++/**
++ * \brief Application-provided TLS 1.3 cryptographic backend.
++ *
++ * API revision 1 establishes lifecycle ownership only. Later local L1
++ * patches append typed cryptographic callbacks to this structure. A backend
++ * must initialize every field and set \p struct_size to sizeof of this
++ * structure as compiled by the application.
++ */
++typedef struct mbedtls_ssl_tls13_crypto_backend {
++    uint32_t api_version;
++    size_t struct_size;
++    uint32_t capabilities;
++
++    mbedtls_ssl_tls13_crypto_backend_connection_init_t
++        *connection_init;
++    mbedtls_ssl_tls13_crypto_backend_connection_free_t
++        *connection_free;
++    mbedtls_ssl_tls13_crypto_backend_transform_free_t
++        *transform_free;
++} mbedtls_ssl_tls13_crypto_backend;
++
++#endif /* MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND */
++
+ #if defined(MBEDTLS_KEY_EXCHANGE_WITH_CERT_ENABLED) &&        \
+     !defined(MBEDTLS_SSL_KEEP_PEER_CERTIFICATE)
+ #define MBEDTLS_SSL_PEER_CERT_DIGEST_MAX_LEN  48
+@@ -1568,6 +1654,12 @@ struct mbedtls_ssl_config {
+     void *MBEDTLS_PRIVATE(p_async_config_data); /*!< Configuration data set by mbedtls_ssl_conf_async_private_cb(). */
+ #endif /* MBEDTLS_SSL_ASYNC_PRIVATE */
+ 
++#if defined(MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND)
++    const mbedtls_ssl_tls13_crypto_backend
++        *MBEDTLS_PRIVATE(tls13_crypto_backend);
++    void *MBEDTLS_PRIVATE(p_tls13_crypto_backend);
++#endif /* MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND */
++
+ #if defined(MBEDTLS_SSL_HANDSHAKE_WITH_CERT_ENABLED)
+ 
+ #if !defined(MBEDTLS_DEPRECATED_REMOVED)
+@@ -1687,6 +1779,11 @@ struct mbedtls_ssl_config {
+ struct mbedtls_ssl_context {
+     const mbedtls_ssl_config *MBEDTLS_PRIVATE(conf); /*!< configuration information          */
+ 
++#if defined(MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND)
++    void *MBEDTLS_PRIVATE(tls13_crypto_backend_data);
++    uint8_t MBEDTLS_PRIVATE(tls13_crypto_backend_active);
++#endif /* MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND */
++
+     /*
+      * Miscellaneous
+      */
+@@ -2959,6 +3056,50 @@ void mbedtls_ssl_set_async_operation_data(mbedtls_ssl_context *ssl,
+                                           void *ctx);
+ #endif /* MBEDTLS_SSL_ASYNC_PRIVATE */
+ 
++#if defined(MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND)
++/**
++ * \brief Register an application-provided TLS 1.3 cryptographic backend.
++ *
++ * Passing NULL for \p backend disables the backend and clears \p config_data.
++ * The backend object and configuration data must remain valid for as long as
++ * the SSL configuration can be used by an SSL context.
++ *
++ * \param conf         SSL configuration context.
++ * \param backend      Backend interface, or NULL to disable it.
++ * \param config_data  Application-owned backend configuration data.
++ *
++ * \return 0 on success.
++ * \return #MBEDTLS_ERR_SSL_BAD_INPUT_DATA if the interface revision,
++ *         size, capabilities, or required callbacks are invalid.
++ */
++int mbedtls_ssl_conf_tls13_crypto_backend(
++    mbedtls_ssl_config *conf,
++    const mbedtls_ssl_tls13_crypto_backend *backend,
++    void *config_data);
++
++/**
++ * \brief Return the TLS 1.3 cryptographic backend registered on \p conf.
++ */
++const mbedtls_ssl_tls13_crypto_backend *
++mbedtls_ssl_conf_get_tls13_crypto_backend(
++    const mbedtls_ssl_config *conf);
++
++/**
++ * \brief Return the backend configuration data registered on \p conf.
++ */
++void *mbedtls_ssl_conf_get_tls13_crypto_backend_config_data(
++    const mbedtls_ssl_config *conf);
++
++/**
++ * \brief Return the backend state associated with one SSL connection.
++ *
++ * The return value is NULL if no backend is active or if the backend chose
++ * not to allocate per-connection state.
++ */
++void *mbedtls_ssl_get_tls13_crypto_backend_connection_data(
++    const mbedtls_ssl_context *ssl);
++#endif /* MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND */
++
+ /**
+  * \brief          Callback type: generate a cookie
+  *
+diff --git a/library/ssl_tls.c b/library/ssl_tls.c
+index c773365bf6..645df5c179 100644
+--- a/library/ssl_tls.c
++++ b/library/ssl_tls.c
+@@ -1364,6 +1364,83 @@ static int ssl_conf_check(const mbedtls_ssl_context *ssl)
+     return 0;
+ }
+ 
++#if defined(MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND)
++MBEDTLS_CHECK_RETURN_CRITICAL
++static int ssl_tls13_crypto_backend_connection_init(
++    mbedtls_ssl_context *ssl)
++{
++    const mbedtls_ssl_tls13_crypto_backend *backend;
++    void *connection_data = NULL;
++    int ret;
++
++    if (ssl == NULL || ssl->conf == NULL) {
++        return MBEDTLS_ERR_SSL_BAD_INPUT_DATA;
++    }
++
++    backend = ssl->conf->tls13_crypto_backend;
++    if (backend == NULL) {
++        return 0;
++    }
++
++    if (ssl->tls13_crypto_backend_active != 0) {
++        MBEDTLS_SSL_DEBUG_MSG(
++            1,
++            ("TLS 1.3 crypto backend connection already initialized"));
++        return MBEDTLS_ERR_SSL_INTERNAL_ERROR;
++    }
++
++    MBEDTLS_SSL_DEBUG_MSG(
++        2,
++        ("TLS 1.3 crypto backend connection init"));
++
++    ret = backend->connection_init(
++        ssl,
++        ssl->conf->p_tls13_crypto_backend,
++        &connection_data);
++    if (ret != 0) {
++        MBEDTLS_SSL_DEBUG_RET(
++            1,
++            "TLS 1.3 crypto backend connection_init",
++            ret);
++        return ret;
++    }
++
++    ssl->tls13_crypto_backend_data = connection_data;
++    ssl->tls13_crypto_backend_active = 1;
++
++    return 0;
++}
++
++static void ssl_tls13_crypto_backend_connection_free(
++    mbedtls_ssl_context *ssl)
++{
++    const mbedtls_ssl_tls13_crypto_backend *backend;
++
++    if (ssl == NULL ||
++        ssl->tls13_crypto_backend_active == 0) {
++        return;
++    }
++
++    backend = ssl->conf == NULL ? NULL :
++              ssl->conf->tls13_crypto_backend;
++
++    MBEDTLS_SSL_DEBUG_MSG(
++        2,
++        ("TLS 1.3 crypto backend connection free"));
++
++    if (backend != NULL &&
++        backend->connection_free != NULL) {
++        backend->connection_free(
++            ssl,
++            ssl->conf->p_tls13_crypto_backend,
++            ssl->tls13_crypto_backend_data);
++    }
++
++    ssl->tls13_crypto_backend_data = NULL;
++    ssl->tls13_crypto_backend_active = 0;
++}
++#endif /* MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND */
++
+ /*
+  * Setup an SSL context
+  */
+@@ -1415,6 +1492,12 @@ int mbedtls_ssl_setup(mbedtls_ssl_context *ssl,
+     memset(&ssl->dtls_srtp_info, 0, sizeof(ssl->dtls_srtp_info));
+ #endif
+ 
++#if defined(MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND)
++    if ((ret = ssl_tls13_crypto_backend_connection_init(ssl)) != 0) {
++        goto error;
++    }
++#endif
++
+     if ((ret = ssl_handshake_init(ssl)) != 0) {
+         goto error;
+     }
+@@ -1422,6 +1505,10 @@ int mbedtls_ssl_setup(mbedtls_ssl_context *ssl,
+     return 0;
+ 
+ error:
++#if defined(MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND)
++    ssl_tls13_crypto_backend_connection_free(ssl);
++#endif
++
+     mbedtls_free(ssl->in_buf);
+     mbedtls_free(ssl->out_buf);
+ 
+@@ -1547,6 +1634,10 @@ int mbedtls_ssl_session_reset_int(mbedtls_ssl_context *ssl, int partial)
+ 
+     mbedtls_ssl_session_reset_msg_layer(ssl, partial);
+ 
++#if defined(MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND)
++    ssl_tls13_crypto_backend_connection_free(ssl);
++#endif
++
+     /* Reset renegotiation state */
+ #if defined(MBEDTLS_SSL_RENEGOTIATION)
+     ssl->renego_status = MBEDTLS_SSL_INITIAL_HANDSHAKE;
+@@ -1582,6 +1673,12 @@ int mbedtls_ssl_session_reset_int(mbedtls_ssl_context *ssl, int partial)
+     }
+ #endif
+ 
++#if defined(MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND)
++    if ((ret = ssl_tls13_crypto_backend_connection_init(ssl)) != 0) {
++        return ret;
++    }
++#endif
++
+     if ((ret = ssl_handshake_init(ssl)) != 0) {
+         return ret;
+     }
+@@ -3074,6 +3171,73 @@ void mbedtls_ssl_set_async_operation_data(mbedtls_ssl_context *ssl,
+ }
+ #endif /* MBEDTLS_SSL_ASYNC_PRIVATE */
+ 
++#if defined(MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND)
++int mbedtls_ssl_conf_tls13_crypto_backend(
++    mbedtls_ssl_config *conf,
++    const mbedtls_ssl_tls13_crypto_backend *backend,
++    void *config_data)
++{
++    uint32_t capabilities;
++
++    if (conf == NULL) {
++        return MBEDTLS_ERR_SSL_BAD_INPUT_DATA;
++    }
++
++    if (backend == NULL) {
++        conf->tls13_crypto_backend = NULL;
++        conf->p_tls13_crypto_backend = NULL;
++        return 0;
++    }
++
++    capabilities = backend->capabilities;
++
++    if (backend->api_version !=
++            MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND_API_VERSION ||
++        backend->struct_size <
++            sizeof(mbedtls_ssl_tls13_crypto_backend) ||
++        (capabilities &
++            ~MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND_CAP_MASK) != 0 ||
++        (capabilities &
++            MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND_CAP_CONNECTION_LIFECYCLE) == 0 ||
++        backend->connection_init == NULL ||
++        backend->connection_free == NULL ||
++        ((capabilities &
++            MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND_CAP_TRANSFORM_LIFECYCLE) != 0 &&
++         backend->transform_free == NULL)) {
++        return MBEDTLS_ERR_SSL_BAD_INPUT_DATA;
++    }
++
++    conf->tls13_crypto_backend = backend;
++    conf->p_tls13_crypto_backend = config_data;
++
++    return 0;
++}
++
++const mbedtls_ssl_tls13_crypto_backend *
++mbedtls_ssl_conf_get_tls13_crypto_backend(
++    const mbedtls_ssl_config *conf)
++{
++    return conf == NULL ? NULL : conf->tls13_crypto_backend;
++}
++
++void *mbedtls_ssl_conf_get_tls13_crypto_backend_config_data(
++    const mbedtls_ssl_config *conf)
++{
++    return conf == NULL ? NULL : conf->p_tls13_crypto_backend;
++}
++
++void *mbedtls_ssl_get_tls13_crypto_backend_connection_data(
++    const mbedtls_ssl_context *ssl)
++{
++    if (ssl == NULL ||
++        ssl->tls13_crypto_backend_active == 0) {
++        return NULL;
++    }
++
++    return ssl->tls13_crypto_backend_data;
++}
++#endif /* MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND */
++
+ /*
+  * SSL get accessors
+  */
+@@ -5570,6 +5734,10 @@ void mbedtls_ssl_free(mbedtls_ssl_context *ssl)
+         mbedtls_free(ssl->session);
+     }
+ 
++#if defined(MBEDTLS_SSL_TLS1_3_CRYPTO_BACKEND)
++    ssl_tls13_crypto_backend_connection_free(ssl);
++#endif
++
+ #if defined(MBEDTLS_X509_CRT_PARSE_C)
+     if (ssl->hostname != NULL) {
+         mbedtls_zeroize_and_free(ssl->hostname, strlen(ssl->hostname));

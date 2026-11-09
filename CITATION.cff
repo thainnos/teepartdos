@@ -1,0 +1,22 @@
+cff-version: 1.2.0
+message: "Please cite the associated NordSec paper when using TeePartDos for academic work; the DOI will be added when available."
+title: "TeePartDos: TLS Partitioning and DoS Robustness Research Artifact"
+authors:
+  - family-names: "Foerster"
+    given-names: "Florian"
+preferred-citation:
+  type: conference-paper
+  title: "Trust vs. Robustness: Denial-of-Service Impact on TLS Partitioning Strategies using TrustZone for Arm Cortex-A"
+  authors:
+    - family-names: "Foerster"
+      given-names: "Florian"
+    - family-names: "Schubaur"
+      given-names: "Philipp"
+    - family-names: "Bley"
+      given-names: "Fabian"
+    - family-names: "Li"
+      given-names: "Shih-Wei"
+    - family-names: "Merli"
+      given-names: "Dominik"
+  conference:
+    name: "31st Nordic Conference on Secure IT Systems (NordSec)"

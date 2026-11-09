@@ -1,0 +1,20 @@
+{
+  "generator_phase_run_end_deadline_utc_ns": 1786599511715114705,
+  "generator_phase_run_end_elapsed_from_reference_s": 143.403822028,
+  "generator_phase_run_end_observed_utc_ns": 1786599511715127312,
+  "generator_phase_run_end_reason": "duration-complete",
+  "generator_phase_run_start_elapsed_from_reference_s": 23.403822028,
+  "generator_phase_run_start_utc_ns": 1786599391715114705,
+  "generator_process_actual_end_utc_ns": 1786599514762190844,
+  "generator_process_actual_start_utc_ns": 1786599388311413714,
+  "generator_process_end_elapsed_from_reference_s": 146.450898167,
+  "generator_process_start_elapsed_from_reference_s": 20.000121037,
+  "generator_scheduled_process_start_utc_ns": 1786599388310949040,
+  "offered_load_phase_timestamps_available": true,
+  "reference_actual_end_utc_ns": 1786599667376027691,
+  "reference_actual_start_utc_ns": 1786599368311292677,
+  "reference_scheduled_start_utc_ns": 1786599368310949040,
+  "run_id": "20260813T053550Z_B_full-handshake_flood_80140851ec",
+  "server_end_utc_ns": 1786599670293379660,
+  "server_start_utc_ns": 1786599352715824711
+}

@@ -1,0 +1,1 @@
+Linux imx8mp-lpddr4-evk 6.12.3-lts-next-g37d02f4dcbbe #1 SMP PREEMPT Sat Mar  1 12:54:50 UTC 2025 aarch64 GNU/Linux

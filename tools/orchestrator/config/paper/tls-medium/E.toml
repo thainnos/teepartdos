@@ -1,0 +1,53 @@
+[campaign]
+campaign_id = "E-tls-flood-medium-final-v1"
+overall_campaign_id = "ABCDE-tls-flood-medium-final-v1"
+campaign_type = "repeated"
+description = "Final fixed-frequency medium-DoS TLS measurements, Scenario E"
+
+[[runs]]
+scenario = "E"
+profile = "measurement"
+reference_workload = "full-handshake"
+reference_duration_s = 300
+generator_backend = "fstack"
+generator_workload = "full-handshake"
+generator_mode = "flood"
+rates = [60.0]
+generator_duration_s = 120
+pre_generation_s = 20
+start_delay_s = 15
+max_inflight = 4096
+record_connections = 32
+repetitions = 5
+
+[[runs]]
+scenario = "E"
+profile = "measurement"
+reference_workload = "resumption"
+reference_duration_s = 300
+generator_backend = "fstack"
+generator_workload = "resumption"
+generator_mode = "flood"
+rates = [60.0]
+generator_duration_s = 120
+pre_generation_s = 20
+start_delay_s = 15
+max_inflight = 4096
+record_connections = 32
+repetitions = 5
+
+[[runs]]
+scenario = "E"
+profile = "measurement"
+reference_workload = "record"
+reference_duration_s = 300
+generator_backend = "fstack"
+generator_workload = "record"
+generator_mode = "flood"
+rates = [800.0]
+generator_duration_s = 120
+pre_generation_s = 20
+start_delay_s = 15
+max_inflight = 4096
+record_connections = 32
+repetitions = 5

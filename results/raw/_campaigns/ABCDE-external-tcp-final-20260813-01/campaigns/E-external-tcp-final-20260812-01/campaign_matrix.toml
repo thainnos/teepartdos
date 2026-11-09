@@ -1,0 +1,22 @@
+# Scenario-specific external TCP stress campaign example. Copy once for each A-E scenario.
+[campaign]
+campaign_id = "D-external-tcp-final-20260813-01"
+overall_campaign_id = "ABCDE-external-tcp-final-20260813-01"
+campaign_type = "repeated"
+description = "Final fixed external TCP-level stress condition; five independent repetitions"
+
+[[runs]]
+scenario = "D"
+profile = "measurement"
+reference_workload = "full-handshake"
+reference_duration_s = 300
+generator_backend = "posix"
+generator_workload = "tcp-syn"
+generator_mode = "flood"
+rates = [0.0] # sentinel: the external command controls its own intensity
+repetitions = 5
+generator_duration_s = 120
+max_inflight = 4096
+record_connections = 32
+pre_generation_s = 20
+start_delay_s = 15

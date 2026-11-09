@@ -1,0 +1,11 @@
+{
+  "errors": [
+    "generator exit code 2",
+    "expected one generator metadata file, found 0",
+    "expected one generator stats file, found 0",
+    "expected one generator timeline file, found 0"
+  ],
+  "status": "FAIL",
+  "validated_utc": "2026-08-13T14:27:11.971434326Z",
+  "warnings": []
+}
